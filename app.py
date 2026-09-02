@@ -3,6 +3,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
+import re
 
 st.set_page_config(page_title="WNW Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
@@ -25,21 +26,18 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped: return curr_p
     
+    # 1. FIXED DAY HEADING LOGIC: Strictly extracts only the first number block digit found. Forces Size 14, Center, Sky Blue!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
         new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
-        parts = [p.strip() for p in stripped.split(":") if p.strip()]
-        day_num = "1"
-        for part in parts:
-            clean_part = part.upper().replace("DAY", "").strip()
-            if clean_part.isdigit():
-                day_num = clean_part
-                break
-                
+        # Robust regex extract: finds the very first integer digit number after the word 'DAY'
+        numbers = re.findall(r'\d+', stripped)
+        day_num = numbers[0] if numbers else "1"
+        
         run_day = new_p.add_run(f"DAY {day_num}")
         run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(14), True
-        run_day.font.color.rgb = RGBColor(0, 163, 224) 
+        run_day.font.color.rgb = RGBColor(0, 163, 224) # Official Vibrant WNW Sky Blue
     elif stripped.startswith("[SUB_ROUTE]"):
         new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -88,25 +86,38 @@ if st.button("Compile Official Word Proposal"):
                 else:
                     if current_mode == "table" and "|" in line:
                         splits = [c.strip() for c in line.split('|') if c.strip()]
-                        if len(splits) >= 5: table_rows_data.append(splits[:4] + [" ".join(splits[4:])])
-                        else: table_rows_data.append(splits)
+                        if len(splits) >= 2:
+                            table_rows_data.append(splits)
                     elif current_mode == "inclusions": inclusions.append(line.strip())
                     elif current_mode == "exclusions": exclusions.append(line.strip())
                     else:
                         if line.strip(): detailed_lines.append(line)
 
+            # 2. FIXED TOUR ROUTE BANNER ENGINE: Safely extracts strictly destination segments from column index 1 only
             calculated_tour_route = ""
             if len(table_rows_data) > 0:
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        city_field = str(r_line).upper()
-                        sub_cities = [c.strip() for c in city_field.split('→') if c.strip()]
+                        # Strictly target the second column field element cell string
+                        city_field = r_line[1].upper()
+                        # Clean up any leftover list symbols from external bugs
+                        cleaned_cell = city_field.replace('[', '').replace(']', '').replace("'", "").replace('"', '')
+                        sub_cities = [c.strip() for c in cleaned_cell.split('→') if c.strip()]
                         for sc in sub_cities:
                             if sc not in route_cities: route_cities.append(sc)
                 if len(route_cities) > 0 and start_city.upper() not in route_cities[-1]:
                     route_cities.append(start_city.upper())
                 calculated_tour_route = " → ".join(route_cities)
+
+            # Process table row structure text mapping allocations
+            processed_table_rows = []
+            for r_line in table_rows_data:
+                if len(r_line) >= 5:
+                    combined_meals = " ".join(r_line[4:])
+                    processed_table_rows.append(r_line[:4] + [combined_meals])
+                else:
+                    processed_table_rows.append(r_line)
 
             for p in doc.paragraphs:
                 if "{{SCHOOL_NAME}}" in p.text: p.text = p.text.replace("{{SCHOOL_NAME}}", school_name)
@@ -153,7 +164,7 @@ if st.button("Compile Official Word Proposal"):
                     if is_target: break
                 
                 if is_target and target_row_idx != -1:
-                    for idx, row_data in enumerate(table_rows_data):
+                    for idx, row_data in enumerate(processed_table_rows):
                         new_row = table.rows[target_row_idx] if idx == 0 else table.add_row()
                         for i in range(min(len(row_data), len(new_row.cells))): 
                             cell_text = row_data[i]
@@ -172,6 +183,3 @@ if st.button("Compile Official Word Proposal"):
             bio = io.BytesIO()
             doc.save(bio)
             st.success("🎉 Final Document compiled perfectly!")
-            st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-        except Exception as e:
-            st.error(f"Error merging template data strings: {str(e)}")
