@@ -76,7 +76,6 @@ if st.button("Compile Official Word Proposal"):
                     if current_mode == "table" and "|" in line:
                         splits = [c.strip() for c in line.split('|') if c.strip()]
                         if len(splits) >= 5:
-                            # CRITICAL FIX: Joins everything from the 5th column onward using clear New Line breaks
                             meal_text = "\n".join(splits[4:])
                             fixed_row = splits[:4] + [meal_text]
                             table_rows_data.append(fixed_row)
@@ -151,9 +150,10 @@ if st.button("Compile Official Word Proposal"):
                 
                 for row in table.rows:
                     for cell in row.cells:
+                        # FIXED LINE 178 PARSING BUG LINK: Safely grabs index 0 of the internal cell paragraph array list loop
                         if "{{STUDENT_COST}}" in cell.text: 
                             cell.text = cell.text.replace("{{STUDENT_COST}}", "")
-                            p_run = cell.paragraphs.add_run(student_cost)
+                            p_run = cell.paragraphs[0].add_run(student_cost)
                             p_run.font.name, p_run.font.size, p_run.font.bold = 'Arial', Pt(14), True
                         if "{{GROUP_STRENGTH}}" in cell.text: cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
                         if "{{TEACHER_RATIO}}" in cell.text: cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
