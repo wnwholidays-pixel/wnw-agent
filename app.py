@@ -89,12 +89,10 @@ if st.button("Compile Official Word Proposal"):
                     else:
                         if line.strip(): detailed_lines.append(line)
 
-            # CLEAN ROUTE BANNER ENGINE: Safely extracts destination parameters from Column 2 cleanly
             calculated_tour_route = ""
             if len(table_rows_data) > 0:
                 route_cities = []
                 for r_line in table_rows_data:
-                    # Target index 1 strictly (the destination text string element)
                     if len(r_line) > 1:
                         city_field = r_line[1].upper()
                         sub_cities = [c.strip() for c in city_field.split('→') if c.strip()]
@@ -162,7 +160,8 @@ if st.button("Compile Official Word Proposal"):
                     for cell in row.cells:
                         if "{{STUDENT_COST}}" in cell.text: 
                             cell.text = cell.text.replace("{{STUDENT_COST}}", "")
-                            p_run = cell.paragraphs.add_run(student_cost)
+                            # FIXED LINE 203: Target index 0 of the paragraph list layout model safely
+                            p_run = cell.paragraphs[0].add_run(student_cost)
                             p_run.font.name, p_run.font.size, p_run.font.bold = 'Arial', Pt(14), True
                         if "{{GROUP_STRENGTH}}" in cell.text: cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
                         if "{{TEACHER_RATIO}}" in cell.text: cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
