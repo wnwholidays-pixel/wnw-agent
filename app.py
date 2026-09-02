@@ -8,7 +8,6 @@ st.set_page_config(page_title="WNW Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
 st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
 
-# SIDEBAR INPUT CONTROLS
 with st.sidebar:
     st.header("📋 Booking Profile")
     school_name = st.text_input("School/College Name:", "AA School")
@@ -26,45 +25,34 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped:
         return curr_p
+    new_p = doc.add_paragraph()
     
-    # 1. FIXED DAY TITLES: Strictly prints ONLY "DAY X" in centered blue. Removes the black repetitive route text completely!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
-        new_p = doc.add_paragraph()
-        new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        day_p, _ = stripped.split(":", 1) # Completely discards everything after the colon
+        # Splits the text into your exact corporate formatting layout
+        day_p, route_p = stripped.split(":", 1)
         
-        run_day = new_p.add_run(day_p.upper().strip())
-        run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(14), True
-        run_day.font.color.rgb = RGBColor(0, 163, 224) # WNW Sky Blue
+        # Line A: Prints only the date heading (e.g. NOV 12) left-aligned in bold corporate blue
+        new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r1 = new_p.add_run(day_p.replace("DAY", "").strip().upper() + "\n")
+        r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(12), True
+        r1.font.color.rgb = RGBColor(0, 86, 179) # WNW Deep Corporate Blue
         
-        curr_p._p.addnext(new_p._p)
-        return new_p
+        # Line B: Prints your bold black route descriptions right below it
+        r2 = new_p.add_run(route_p.strip().upper())
+        r2.font.name, r2.font.size, r2.font.bold = 'Arial', Pt(11), True
+        r2.font.color.rgb = RGBColor(0, 0, 0)
         
-    # 2. SUB-ROUTE BANNER: Perfectly left-aligned and colored in blue
     elif stripped.startswith("[SUB_ROUTE]"):
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(11), True, True
-        r_sub.font.color.rgb = RGBColor(0, 163, 224)
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 3. TIMELINE DIVIDERS
+        r_sub.font.color.rgb = RGBColor(0, 86, 179)
     elif "---" in stripped:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 4. TIMELINE ENTRIES AND BULLETS
     else:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
             space_idx = stripped.find(" ")
@@ -76,8 +64,8 @@ def append_styled_line(doc, curr_p, d_line):
             r_txt = new_p.add_run(stripped)
             r_txt.font.name, r_txt.font.size = 'Arial', Pt(11)
             
-        curr_p._p.addnext(new_p._p)
-        return new_p
+    curr_p._p.addnext(new_p._p)
+    return new_p
 
 if st.button("Compile Official Word Proposal"):
     if not pasted_itinerary:
