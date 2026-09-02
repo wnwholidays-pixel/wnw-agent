@@ -167,11 +167,11 @@ if st.button("Compile Official Word Proposal"):
 
             # SWAP TABLES GRID FOR HIGHLIGHTS AND PRICING
             for table in doc.tables:
-                # FIXED LOOP: Scan cleanly across all cells inside row 1 to see if the tag exists
                 is_target_table = False
                 if len(table.rows) > 1:
-                    for check_cell in table.rows[1].cells:
-                        if "{{DAY_NUM}}" in check_cell.text:
+                    # Clean look across cells inside row 1 to see if the tag exists safely
+                    for cell in table.rows[1].cells:
+                        if "{{DAY_NUM}}" in cell.text:
                             is_target_table = True
                             break
                 
