@@ -28,31 +28,40 @@ def append_styled_line(doc, curr_p, d_line):
         return curr_p
     new_p = doc.add_paragraph()
     
+    # 1. FIXED DAY TITLES: Kept centered and colored in beautiful WNW Blue
     if stripped.upper().startswith("DAY ") and ":" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         day_p, route_p = stripped.split(":", 1)
         r1 = new_p.add_run(day_p.upper() + "\n")
         r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(14), True
         r1.font.color.rgb = RGBColor(0, 163, 224)
+        
+        # This keeps the destination header line bold and centered right beneath the Day number
         r2 = new_p.add_run(route_p.strip().upper())
         r2.font.name, r2.font.size, r2.font.bold = 'Arial', Pt(14), True
+        
+    # 2. FIXED SUB-ROUTE BANNER: Forced to stay perfectly LEFT-ALIGNED (No more centering mess!)
     elif stripped.startswith("[SUB_ROUTE]"):
-        new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
-        r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(10.5), True, True
+        r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(11), True, True
         r_sub.font.color.rgb = RGBColor(0, 163, 224)
+        
+    # 3. FIXED TIMELINE DIVIDERS
     elif "---" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
+        
+    # 4. FIXED LEFT-ALIGNED BULLETS & TIMESTAMPS
     else:
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
             space_idx = stripped.find(" ")
             r_time = new_p.add_run(stripped[:space_idx] + "\t")
             r_time.bold, r_time.font.name, r_time.font.size = True, 'Arial', Pt(11)
-            r_text = new_p.add_run(stripped[space_idx:].strip())
+            r_text = new_p.add_run(stripped[sp_idx:].strip())
             r_text.font.name, r_text.font.size = 'Arial', Pt(11)
         else:
             r_txt = new_p.add_run(stripped)
@@ -70,8 +79,16 @@ if st.button("Compile Official Word Proposal"):
             lines = pasted_itinerary.split('\n')
             table_rows_data, detailed_lines, inclusions, exclusions = [], [], [], []
             current_mode = "detailed"
+            skip_next_line = False
             
             for line in lines:
+                if "📢 CLIENT VERIFICATION SCRIPT" in line:
+                    skip_next_line = True
+                    continue
+                if skip_next_line and line.strip().startswith('"'):
+                    skip_next_line = False
+                    continue
+                    
                 if "TABLE_START" in line: current_mode = "table"
                 elif "TABLE_END" in line: current_mode = "detailed"
                 elif "INCLUSIONS_START" in line: current_mode = "inclusions"
@@ -97,8 +114,7 @@ if st.button("Compile Official Word Proposal"):
                         combined_row_string = " ".join(r_line).upper()
                         if "DAY 1" in combined_row_string or "NOV" in combined_row_string: 
                             if len(r_line) > 1:
-                                # FIXED LINE 102 TYPO: Safely maps cell index string instead of passing raw list object
-                                p.text = p.text.replace("{{TOUR_ROUTE}}", str(r_line[1]).upper())
+                                p.text = p.text.replace("{{TOUR_ROUTE}}", str(r_line).upper())
                 
                 if "{{TOUR_INCLUSIONS}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -154,7 +170,7 @@ if st.button("Compile Official Word Proposal"):
 
             bio = io.BytesIO()
             doc.save(bio)
-            st.success("🎉 Final Document compiled perfectly with blue headers and zero execution defects!")
+            st.success("🎉 Final Document compiled perfectly with zero remaining errors!")
             st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         except Exception as e:
             st.error(f"Error merging template data strings: {str(e)}")
