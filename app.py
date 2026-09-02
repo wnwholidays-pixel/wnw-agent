@@ -148,7 +148,7 @@ if st.button("Compile Official Word Proposal"):
                         else:
                             new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                             # Split timestamps safely if present to bold them on the left
-                            if len(stripped_line) > 5 and (stripped_line[2].isdigit() or stripped_line[1] == ":") and " " in stripped_line:
+                            if len(stripped_line) > 5 and stripped_line[0:2].isdigit() and ":" in stripped_line:
                                 space_idx = stripped_line.find(" ")
                                 time_part = stripped_line[:space_idx]
                                 text_part = stripped_line[space_idx:]
@@ -171,11 +171,11 @@ if st.button("Compile Official Word Proposal"):
 
             # SWAP TABLES GRID FOR HIGHLIGHTS AND PRICING
             for table in doc.tables:
-                if len(table.rows) > 1 and "{{DAY_NUM}}" in table.rows.cells.text:
+                if len(table.rows) > 1 and "{{DAY_NUM}}" in table.rows.cells[index].text for index in range(len(table.rows.cells)):
                     base_row = table.rows
                     for index, row_data in enumerate(table_rows_data):
                         if index == 0:
-                            new_row = table.rows
+                            new_row = base_row
                         else:
                             new_row = table.add_row()
                         for i in range(min(len(row_data), len(new_row.cells))):
