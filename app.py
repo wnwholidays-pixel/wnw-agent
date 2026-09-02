@@ -49,10 +49,10 @@ def append_styled_line(doc, curr_p, d_line):
     else:
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
-            sp_idx = stripped.find(" ")
-            r_time = new_p.add_run(stripped[:sp_idx] + "\t")
+            space_idx = stripped.find(" ")
+            r_time = new_p.add_run(stripped[:space_idx] + "\t")
             r_time.bold, r_time.font.name, r_time.font.size = True, 'Arial', Pt(11)
-            r_text = new_p.add_run(stripped[sp_idx:].strip())
+            r_text = new_p.add_run(stripped[space_idx:].strip())
             r_text.font.name, r_text.font.size = 'Arial', Pt(11)
         else:
             r_txt = new_p.add_run(stripped)
@@ -94,11 +94,11 @@ if st.button("Compile Official Word Proposal"):
                 if "{{TOUR_DURATION}}" in p.text: p.text = p.text.replace("{{TOUR_DURATION}}", tour_duration)
                 if "{{TOUR_ROUTE}}" in p.text:
                     for r_line in table_rows_data:
-                        # SMART FIX: Converts the whole row to a single upper line check to find day 1 route cleanly
                         combined_row_string = " ".join(r_line).upper()
                         if "DAY 1" in combined_row_string or "NOV" in combined_row_string: 
                             if len(r_line) > 1:
-                                p.text = p.text.replace("{{TOUR_ROUTE}}", r_line[1].upper())
+                                # FIXED LINE 102 TYPO: Safely maps cell index string instead of passing raw list object
+                                p.text = p.text.replace("{{TOUR_ROUTE}}", str(r_line[1]).upper())
                 
                 if "{{TOUR_INCLUSIONS}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
