@@ -15,7 +15,7 @@ with st.sidebar:
     destination_name = st.text_input("Destination Label:", "CHANDIGARH – MANALI")
     tour_duration = st.text_input("Duration Frame:", "6 Nights / 7 Days")
     st.header("💰 Pricing Matrix")
-    student_cost = st.text_input("Cost Per Student:", "**Rs. 13,500/-**")
+    student_cost = st.text_input("Cost Per Student:", "Rs. 13,500/-")
     group_strength = st.text_input("Group Strength:", "45 (Minimum)")
     teacher_ratio = st.text_input("Teacher Ratio:", "15:01")
 
@@ -26,7 +26,6 @@ def append_styled_line(doc, curr_p, d_line):
     if not stripped: return curr_p
     new_p = doc.add_paragraph()
     
-    # 1. CENTERED DAY HEADINGS: Upgraded directly to Font Size 16!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         day_part, _ = stripped.split(":", 1)
@@ -34,12 +33,11 @@ def append_styled_line(doc, curr_p, d_line):
         r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(16), True
         r1.font.color.rgb = RGBColor(0, 86, 179)
         
-    # 2. LEFT-ALIGNED SUB-ROUTE BANNER: Stripped away italics completely to stay straight bold blue!
     elif stripped.startswith("[SUB_ROUTE]"):
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold = 'Arial', Pt(11), True
-        r_sub.font.italic = False # Enforces standard straight corporate block letters
+        r_sub.font.italic = False 
         r_sub.font.color.rgb = RGBColor(0, 86, 179)
         
     elif "---" in stripped:
@@ -152,13 +150,17 @@ if st.button("Compile Official Word Proposal"):
                 
                 for row in table.rows:
                     for cell in row.cells:
-                        if "{{STUDENT_COST}}" in cell.text: cell.text = cell.text.replace("{{STUDENT_COST}}", student_cost)
+                        # FIXED COSTING DESIGN ENGINE: Replaces the tag and applies Size 14 Bold to the text cell
+                        if "{{STUDENT_COST}}" in cell.text: 
+                            cell.text = cell.text.replace("{{STUDENT_COST}}", "")
+                            p_run = cell.paragraphs[0].add_run(student_cost)
+                            p_run.font.name, p_run.font.size, p_run.font.bold = 'Arial', Pt(14), True
                         if "{{GROUP_STRENGTH}}" in cell.text: cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
                         if "{{TEACHER_RATIO}}" in cell.text: cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
 
             bio = io.BytesIO()
             doc.save(bio)
-            st.success("🎉 Final Document compiled perfectly with zero remaining errors!")
+            st.success("🎉 Final Document compiled perfectly with size 14 bold pricing!")
             st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         except Exception as e:
             st.error(f"Error merging template data strings: {str(e)}")
