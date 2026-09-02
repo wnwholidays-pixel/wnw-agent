@@ -25,12 +25,16 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped: return curr_p
     new_p = doc.add_paragraph()
+    
+    # 1. CENTERED DAY HEADINGS: Forces DAY 1, DAY 2, DAY 3 to look bold, clean, and perfectly centered
     if stripped.upper().startswith("DAY ") and ":" in stripped:
-        new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         day_part, _ = stripped.split(":", 1)
         r1 = new_p.add_run(day_part.upper().strip())
         r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(12), True
         r1.font.color.rgb = RGBColor(0, 86, 179)
+        
+    # 2. LEFT-ALIGNED SUB-ROUTE BANNER
     elif stripped.startswith("[SUB_ROUTE]"):
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
@@ -87,10 +91,10 @@ if st.button("Compile Official Word Proposal"):
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        sub_cities = [c.strip() for c in r_line[1].upper().split('→') if c.strip()]
+                        sub_cities = [c.strip() for c in r_line.upper().split('→') if c.strip()]
                         for sc in sub_cities:
                             if sc not in route_cities: route_cities.append(sc)
-                if len(route_cities) > 0: route_cities.append(route_cities[0])
+                if len(route_cities) > 0: route_cities.append(route_cities)
                 calculated_tour_route = " → ".join(route_cities)
 
             for p in doc.paragraphs:
