@@ -5,10 +5,15 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 import re
 
-st.set_page_config(page_title="WNW Template Engine", layout="wide")
+st.set_page_config(
+    page_title="WNW Template Engine",
+    layout="wide"
+)
 
 st.title("🦅 Wings 'N' Wheels Holidays")
-st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
+st.caption(
+    "Official Production Studio - Final Master Template Merger Engine (.docx)"
+)
 
 
 # ============================================================
@@ -58,7 +63,7 @@ with st.sidebar:
 
 
 # ============================================================
-# ITINERARY INPUT
+# PASTE ITINERARY
 # ============================================================
 
 pasted_itinerary = st.text_area(
@@ -68,156 +73,232 @@ pasted_itinerary = st.text_area(
 
 
 # ============================================================
-# REMOVE OLD TEMPLATE DAY HEADINGS
+# REMOVE ALL STATIC DAY HEADINGS FROM TEMPLATE
+# ============================================================
+#
+# THIS IS THE IMPORTANT FIX.
+#
+# The previous code only checked doc.paragraphs.
+# Word can store paragraphs inside:
+#
+# - tables
+# - text boxes
+# - shapes
+# - other XML containers
+#
+# This function searches the complete Word XML and removes
+# ANY paragraph whose text is a DAY heading.
+#
+# Example:
+#
+# DAY 1 : DAY 1
+# DAY 2 : DAY 2
+# DAY 3 : NOV 14
+#
+# ALL are removed from the template before we insert
+# the generated itinerary.
 # ============================================================
 
-def remove_old_day_headings(doc):
-    """
-    Removes static DAY headings already present in template.docx.
+def remove_all_template_day_headings(doc):
 
-    Example removed:
-        DAY 1 : DAY 1
-        DAY 1 : NOV 12
-        DAY 2 : NOV 13
-
-    This prevents the template heading from appearing
-    together with the generated itinerary heading.
-    """
-
-    day_pattern = re.compile(
-        r"^\s*DAY\s+\d+\s*:\s*.*$",
+    day_heading_pattern = re.compile(
+        r"^\s*DAY\s+\d+\s*(?::.*)?\s*$",
         re.IGNORECASE
     )
 
-    simple_day_pattern = re.compile(
-        r"^\s*DAY\s+\d+\s*$",
-        re.IGNORECASE
+    # Search the complete document XML.
+    # This includes paragraphs inside tables and text boxes.
+
+    root = doc.element
+
+    paragraphs_to_remove = []
+
+    for paragraph_xml in root.iter():
+
+        # Word paragraph XML tag
+        if paragraph_xml.tag.endswith("}p"):
+
+            # Collect all text inside this paragraph
+            text_parts = []
+
+            for text_node in paragraph_xml.iter():
+
+                if text_node.tag.endswith("}t"):
+                    if text_node.text:
+                        text_parts.append(text_node.text)
+
+            paragraph_text = "".join(text_parts).strip()
+
+            if day_heading_pattern.match(
+                paragraph_text
+            ):
+
+                paragraphs_to_remove.append(
+                    paragraph_xml
+                )
+
+    # Remove all matching paragraphs
+    for paragraph_xml in paragraphs_to_remove:
+
+        parent = paragraph_xml.getparent()
+
+        if parent is not None:
+
+            parent.remove(
+                paragraph_xml
+            )
+
+
+# ============================================================
+# CREATE DAY HEADING
+# ============================================================
+
+def create_day_heading(
+    doc,
+    curr_p,
+    day_number,
+    date_text=""
+):
+
+    new_p = doc.add_paragraph()
+
+    # CENTER ALIGN
+    new_p.alignment = (
+        WD_ALIGN_PARAGRAPH.CENTER
     )
 
-    for paragraph in list(doc.paragraphs):
+    # --------------------------------------------------------
+    # FINAL HEADING TEXT
+    #
+    # If there is NO date:
+    # DAY 1
+    #
+    # If there IS a date:
+    # DAY 1 : OCT 02
+    # --------------------------------------------------------
 
-        text = paragraph.text.strip()
+    if date_text:
 
-        if (
-            day_pattern.match(text)
-            or simple_day_pattern.match(text)
-        ):
+        heading_text = (
+            f"DAY {day_number} : "
+            f"{date_text.upper()}"
+        )
 
-            parent = paragraph._element.getparent()
+    else:
 
-            if parent is not None:
-                parent.remove(paragraph._element)
+        heading_text = (
+            f"DAY {day_number}"
+        )
+
+    # --------------------------------------------------------
+    # DAY HEADING RUN
+    # --------------------------------------------------------
+
+    run_day = new_p.add_run(
+        heading_text
+    )
+
+    # FONT
+    run_day.font.name = "Arial"
+
+    # SIZE
+    run_day.font.size = Pt(14)
+
+    # BOLD
+    run_day.font.bold = True
+
+    # BLUE
+    run_day.font.color.rgb = RGBColor(
+        0,
+        86,
+        179
+    )
+
+    # --------------------------------------------------------
+    # INSERT AFTER PREVIOUS PARAGRAPH
+    # --------------------------------------------------------
+
+    curr_p._p.addnext(
+        new_p._p
+    )
+
+    return new_p
 
 
 # ============================================================
-# ADD STYLED ITINERARY LINE
+# FORMAT ITINERARY LINE
 # ============================================================
 
-def append_styled_line(doc, curr_p, d_line):
+def append_styled_line(
+    doc,
+    curr_p,
+    d_line
+):
 
     stripped = d_line.strip()
 
     if not stripped:
         return curr_p
 
-    new_p = doc.add_paragraph()
-
 
     # ========================================================
     # DAY HEADING
     # ========================================================
 
-    if re.match(
-        r"^DAY\s+\d+",
+    day_match = re.match(
+        r"^DAY\s+(\d+)",
         stripped,
         re.IGNORECASE
-    ):
+    )
 
-        new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if day_match:
 
-        # Extract day number
-        day_match = re.search(
-            r"DAY\s+(\d+)",
-            stripped,
-            re.IGNORECASE
-        )
+        day_number = day_match.group(1)
 
-        day_num = (
-            day_match.group(1)
-            if day_match
-            else "1"
-        )
+        date_text = ""
 
         # ----------------------------------------------------
-        # Check if a real date exists
-        #
-        # DAY 1 : DAY 1
-        #        ↓
-        # DAY 1
-        #
-        # DAY 1 : NOV 12
-        #        ↓
-        # DAY 1 : NOV 12
+        # Look for text after :
         # ----------------------------------------------------
-
-        date_part = ""
 
         if ":" in stripped:
 
             after_colon = (
-                stripped.split(":", 1)[1]
+                stripped
+                .split(":", 1)[1]
                 .strip()
             )
 
-            # Do NOT treat "DAY 1" as a date
+            # If after colon is "DAY 1",
+            # there is NO date.
             if not re.match(
                 r"^DAY\s+\d+$",
                 after_colon,
                 re.IGNORECASE
             ):
 
-                date_part = after_colon
+                date_text = after_colon
 
-        # ----------------------------------------------------
-        # FINAL DAY HEADING
-        # ----------------------------------------------------
-
-        if date_part:
-
-            heading_text = (
-                f"DAY {day_num} : "
-                f"{date_part.upper()}"
-            )
-
-        else:
-
-            heading_text = f"DAY {day_num}"
-
-        # ----------------------------------------------------
-        # FORMAT
-        # ----------------------------------------------------
-
-        run_day = new_p.add_run(
-            heading_text
+        return create_day_heading(
+            doc,
+            curr_p,
+            day_number,
+            date_text
         )
 
-        run_day.font.name = "Arial"
-        run_day.font.size = Pt(14)
-        run_day.font.bold = True
 
-        # Blue
-        run_day.font.color.rgb = RGBColor(
-            0,
-            86,
-            179
-        )
+    # ========================================================
+    # CREATE NORMAL PARAGRAPH
+    # ========================================================
+
+    new_p = doc.add_paragraph()
 
 
     # ========================================================
     # SUB ROUTE
     # ========================================================
 
-    elif stripped.startswith(
+    if stripped.startswith(
         "[SUB_ROUTE]"
     ):
 
@@ -274,7 +355,7 @@ def append_styled_line(doc, curr_p, d_line):
 
 
     # ========================================================
-    # TIMELINE EVENT
+    # TIMELINE
     # ========================================================
 
     else:
@@ -303,22 +384,16 @@ def append_styled_line(doc, curr_p, d_line):
                 .strip()
             )
 
-            # ------------------------------------------------
             # TIME
-            # ------------------------------------------------
-
             r_time = new_p.add_run(
                 time_text + "\t"
             )
 
-            r_time.bold = True
             r_time.font.name = "Arial"
             r_time.font.size = Pt(11)
+            r_time.bold = True
 
-            # ------------------------------------------------
-            # EVENT
-            # ------------------------------------------------
-
+            # EVENT TEXT
             r_text = new_p.add_run(
                 event_text
             )
@@ -336,8 +411,9 @@ def append_styled_line(doc, curr_p, d_line):
             r_txt.font.size = Pt(11)
 
 
-    # Insert new paragraph immediately
-    # after the previous paragraph
+    # ========================================================
+    # INSERT AFTER PREVIOUS PARAGRAPH
+    # ========================================================
 
     curr_p._p.addnext(
         new_p._p
@@ -347,7 +423,7 @@ def append_styled_line(doc, curr_p, d_line):
 
 
 # ============================================================
-# COMPILE DOCUMENT
+# COMPILE
 # ============================================================
 
 if st.button(
@@ -374,16 +450,20 @@ if st.button(
 
 
             # ==================================================
-            # IMPORTANT:
-            # REMOVE THE STATIC DAY HEADING FROM TEMPLATE
+            # CRITICAL FIX
             #
-            # This is what fixes:
+            # REMOVE EVERY STATIC DAY HEADING FROM TEMPLATE
+            #
+            # This removes:
             #
             # DAY 1 : DAY 1
+            # DAY 2 : DAY 2
+            # DAY 3 : DAY 3
             #
+            # even if they are inside tables/text boxes.
             # ==================================================
 
-            remove_old_day_headings(
+            remove_all_template_day_headings(
                 doc
             )
 
@@ -445,10 +525,7 @@ if st.button(
 
                 else:
 
-                    # ------------------------------------------
                     # TABLE
-                    # ------------------------------------------
-
                     if (
                         current_mode == "table"
                         and "|" in line
@@ -459,8 +536,6 @@ if st.button(
                             for c in line.split("|")
                             if c.strip()
                         ]
-
-                        # Ignore table header
 
                         if (
                             len(splits) >= 2
@@ -473,10 +548,7 @@ if st.button(
                             )
 
 
-                    # ------------------------------------------
                     # INCLUSIONS
-                    # ------------------------------------------
-
                     elif (
                         current_mode
                         == "inclusions"
@@ -489,10 +561,7 @@ if st.button(
                             )
 
 
-                    # ------------------------------------------
                     # EXCLUSIONS
-                    # ------------------------------------------
-
                     elif (
                         current_mode
                         == "exclusions"
@@ -505,10 +574,7 @@ if st.button(
                             )
 
 
-                    # ------------------------------------------
-                    # DETAILED ITINERARY
-                    # ------------------------------------------
-
+                    # DETAILED
                     else:
 
                         if stripped_line:
@@ -519,7 +585,7 @@ if st.button(
 
 
             # ==================================================
-            # CALCULATE TOUR ROUTE
+            # CALCULATE ROUTE
             # ==================================================
 
             calculated_tour_route = ""
@@ -577,7 +643,7 @@ if st.button(
 
 
             # ==================================================
-            # PROCESS TABLE MEALS
+            # PROCESS MEALS
             # ==================================================
 
             processed_table_rows = []
@@ -611,10 +677,7 @@ if st.button(
             for p in doc.paragraphs:
 
 
-                # ----------------------------------------------
-                # SCHOOL NAME
-                # ----------------------------------------------
-
+                # SCHOOL
                 if "{{SCHOOL_NAME}}" in p.text:
 
                     p.text = p.text.replace(
@@ -623,10 +686,7 @@ if st.button(
                     )
 
 
-                # ----------------------------------------------
                 # DESTINATION
-                # ----------------------------------------------
-
                 if "{{DESTINATION_NAME}}" in p.text:
 
                     p.text = p.text.replace(
@@ -635,10 +695,7 @@ if st.button(
                     )
 
 
-                # ----------------------------------------------
-                # TOUR DURATION
-                # ----------------------------------------------
-
+                # DURATION
                 if "{{TOUR_DURATION}}" in p.text:
 
                     p.text = p.text.replace(
@@ -647,10 +704,7 @@ if st.button(
                     )
 
 
-                # ----------------------------------------------
-                # TOUR ROUTE
-                # ----------------------------------------------
-
+                # ROUTE
                 if "{{TOUR_ROUTE}}" in p.text:
 
                     p.text = p.text.replace(
@@ -677,9 +731,6 @@ if st.button(
                     curr_inc_p = p
 
                     for inc_line in inclusions:
-
-                        if not inc_line:
-                            continue
 
                         new_inc = (
                             doc.add_paragraph()
@@ -722,9 +773,6 @@ if st.button(
 
                     for exc_line in exclusions:
 
-                        if not exc_line:
-                            continue
-
                         new_exc = (
                             doc.add_paragraph()
                         )
@@ -753,7 +801,7 @@ if st.button(
 
                 if "{{DETAILED_ITINERARY}}" in p.text:
 
-                    # Completely empty placeholder paragraph
+                    # Clear placeholder
                     p.text = ""
 
                     p.alignment = (
@@ -772,7 +820,7 @@ if st.button(
 
 
             # ==================================================
-            # PROCESS TABLES
+            # TABLE PROCESSING
             # ==================================================
 
             for table in doc.tables:
@@ -829,9 +877,7 @@ if st.button(
                             )
                         ):
 
-                            cell_text = (
-                                row_data[i]
-                            )
+                            cell_text = row_data[i]
 
                             if i == 4:
 
@@ -852,14 +898,10 @@ if st.button(
                             ].text = cell_text
 
 
-                # ==================================================
                 # PRICING
-                # ==================================================
-
                 for row in table.rows:
 
                     for cell in row.cells:
-
 
                         if (
                             "{{STUDENT_COST}}"
@@ -913,12 +955,14 @@ if st.button(
 
 
             # ==================================================
-            # SAVE
+            # SAVE DOCUMENT
             # ==================================================
 
             bio = io.BytesIO()
 
-            doc.save(bio)
+            doc.save(
+                bio
+            )
 
             st.success(
                 "🎉 Final Document compiled perfectly!"
