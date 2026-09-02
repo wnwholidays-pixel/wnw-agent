@@ -25,33 +25,26 @@ pasted_itinerary = st.text_area("Pasted Itinerary Body Text:", height=450)
 def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped: return curr_p
+    new_p = doc.add_paragraph()
     
-    # 1. FIXED DAY HEADING LOGIC: Strictly extracts only the first number block digit found. Forces Size 14, Center, Sky Blue!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # Robust regex extract: finds the very first integer digit number after the word 'DAY'
         numbers = re.findall(r'\d+', stripped)
         day_num = numbers[0] if numbers else "1"
-        
         run_day = new_p.add_run(f"DAY {day_num}")
         run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(14), True
-        run_day.font.color.rgb = RGBColor(0, 163, 224) # Official Vibrant WNW Sky Blue
+        run_day.font.color.rgb = RGBColor(0, 163, 224) 
     elif stripped.startswith("[SUB_ROUTE]"):
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold = 'Arial', Pt(11), True
         r_sub.font.color.rgb = RGBColor(0, 86, 179)
     elif "---" in stripped:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
     else:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
             space_idx = stripped.find(" ")
@@ -86,22 +79,18 @@ if st.button("Compile Official Word Proposal"):
                 else:
                     if current_mode == "table" and "|" in line:
                         splits = [c.strip() for c in line.split('|') if c.strip()]
-                        if len(splits) >= 2:
-                            table_rows_data.append(splits)
+                        if len(splits) >= 2: table_rows_data.append(splits)
                     elif current_mode == "inclusions": inclusions.append(line.strip())
                     elif current_mode == "exclusions": exclusions.append(line.strip())
                     else:
                         if line.strip(): detailed_lines.append(line)
 
-            # 2. FIXED TOUR ROUTE BANNER ENGINE: Safely extracts strictly destination segments from column index 1 only
             calculated_tour_route = ""
             if len(table_rows_data) > 0:
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        # Strictly target the second column field element cell string
-                        city_field = r_line[1].upper()
-                        # Clean up any leftover list symbols from external bugs
+                        city_field = str(r_line[1]).upper()
                         cleaned_cell = city_field.replace('[', '').replace(']', '').replace("'", "").replace('"', '')
                         sub_cities = [c.strip() for c in cleaned_cell.split('→') if c.strip()]
                         for sc in sub_cities:
@@ -110,7 +99,6 @@ if st.button("Compile Official Word Proposal"):
                     route_cities.append(start_city.upper())
                 calculated_tour_route = " → ".join(route_cities)
 
-            # Process table row structure text mapping allocations
             processed_table_rows = []
             for r_line in table_rows_data:
                 if len(r_line) >= 5:
@@ -183,3 +171,6 @@ if st.button("Compile Official Word Proposal"):
             bio = io.BytesIO()
             doc.save(bio)
             st.success("🎉 Final Document compiled perfectly!")
+            st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        except Exception as e:
+            st.error(f"Error merging template data strings: {str(e)}")
