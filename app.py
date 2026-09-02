@@ -33,7 +33,7 @@ def append_styled_line(doc, curr_p, d_line):
         
         run_day = new_p.add_run(f"DAY {clean_day_label}")
         run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(14), True
-        run_day.font.color.rgb = RGBColor(0, 163, 224) # Official Vibrant WNW Sky Blue
+        run_day.font.color.rgb = RGBColor(0, 163, 224) 
     elif stripped.startswith("[SUB_ROUTE]"):
         new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -89,15 +89,18 @@ if st.button("Compile Official Word Proposal"):
                     else:
                         if line.strip(): detailed_lines.append(line)
 
+            # CLEAN ROUTE BANNER ENGINE: Safely extracts destination parameters from Column 2 cleanly
             calculated_tour_route = ""
             if len(table_rows_data) > 0:
                 route_cities = []
                 for r_line in table_rows_data:
+                    # Target index 1 strictly (the destination text string element)
                     if len(r_line) > 1:
-                        cleaned_cell = str(r_line).upper().replace('[', '').replace(']', '').replace("'", "").replace('', '')
-                        sub_cities = [c.strip() for c in cleaned_cell.split('→') if c.strip()]
+                        city_field = r_line[1].upper()
+                        sub_cities = [c.strip() for c in city_field.split('→') if c.strip()]
                         for sc in sub_cities:
-                            if sc not in route_cities: route_cities.append(sc)
+                            if sc not in route_cities: 
+                                route_cities.append(sc)
                 if len(route_cities) > 0 and start_city.upper() not in route_cities[-1]:
                     route_cities.append(start_city.upper())
                 calculated_tour_route = " → ".join(route_cities)
@@ -159,7 +162,7 @@ if st.button("Compile Official Word Proposal"):
                     for cell in row.cells:
                         if "{{STUDENT_COST}}" in cell.text: 
                             cell.text = cell.text.replace("{{STUDENT_COST}}", "")
-                            p_run = cell.paragraphs[0].add_run(student_cost)
+                            p_run = cell.paragraphs.add_run(student_cost)
                             p_run.font.name, p_run.font.size, p_run.font.bold = 'Arial', Pt(14), True
                         if "{{GROUP_STRENGTH}}" in cell.text: cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
                         if "{{TEACHER_RATIO}}" in cell.text: cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
