@@ -5,11 +5,13 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 import re
 import os
+import shutil
 import subprocess
 import tempfile
 
+
 # ============================================================
-# PAGE SETUP
+# PAGE CONFIGURATION
 # ============================================================
 
 st.set_page_config(
@@ -18,7 +20,9 @@ st.set_page_config(
 )
 
 st.title("🦅 Wings 'N' Wheels Holidays")
-st.caption("Official Production Studio - Final Master Template Merger Engine (.docx + .pdf)")
+st.caption(
+    "Official Production Studio - Final Master Template Merger Engine"
+)
 
 
 # ============================================================
@@ -26,6 +30,7 @@ st.caption("Official Production Studio - Final Master Template Merger Engine (.d
 # ============================================================
 
 with st.sidebar:
+
     st.header("📋 Booking Profile")
 
     school_name = st.text_input(
@@ -72,129 +77,271 @@ with st.sidebar:
 
 pasted_itinerary = st.text_area(
     "Pasted Itinerary Body Text:",
-    height=550,
-    placeholder="Paste the TABLE_START / INCLUSIONS_START / EXCLUSIONS_START / DAY itinerary here..."
+    height=600,
+    placeholder=(
+        "Paste the complete formatted itinerary here "
+        "starting from TABLE_START..."
+    )
 )
 
 
 # ============================================================
-# HELPER - ADD STYLED ITINERARY LINE
+# STYLE CONSTANTS
 # ============================================================
 
-def append_styled_line(doc, curr_p, d_line):
+BLUE_DAY = RGBColor(0, 163, 224)
+BLUE_ROUTE = RGBColor(0, 86, 179)
+GREY_DIVIDER = RGBColor(100, 100, 100)
 
-    stripped = d_line.strip()
+FONT_NAME = "Arial"
 
-    if not stripped:
-        return curr_p
 
-    new_p = doc.add_paragraph()
+# ============================================================
+# DAY HEADING FORMATTER
+# ============================================================
 
-    # --------------------------------------------------------
-    # DAY HEADING
-    # --------------------------------------------------------
+def format_day_heading(paragraph, day_number):
 
-    if stripped.upper().startswith("DAY ") and ":" in stripped:
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = paragraph.add_run(
+        f"DAY {day_number}"
+    )
 
-        numbers = re.findall(r"\d+", stripped)
-        day_num = numbers[0] if numbers else "1"
+    run.font.name = FONT_NAME
+    run.font.size = Pt(14)
+    run.font.bold = True
+    run.font.color.rgb = BLUE_DAY
 
-        run_day = new_p.add_run(f"DAY {day_num}")
 
-        run_day.font.name = "Arial"
-        run_day.font.size = Pt(14)
-        run_day.font.bold = True
-        run_day.font.color.rgb = RGBColor(0, 163, 224)
+# ============================================================
+# ROUTE FORMATTER
+# ============================================================
 
-    # --------------------------------------------------------
-    # SUB ROUTE
-    # --------------------------------------------------------
+def format_route(paragraph, route_text):
 
-    elif stripped.startswith("[SUB_ROUTE]"):
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-        new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = paragraph.add_run(
+        route_text
+    )
 
-        route_text = stripped.replace(
-            "[SUB_ROUTE]",
-            ""
-        ).strip()
+    run.font.name = FONT_NAME
+    run.font.size = Pt(11)
+    run.font.bold = True
+    run.font.color.rgb = BLUE_ROUTE
 
-        r_sub = new_p.add_run(route_text)
 
-        r_sub.font.name = "Arial"
-        r_sub.font.size = Pt(11)
-        r_sub.font.bold = True
-        r_sub.font.color.rgb = RGBColor(0, 86, 179)
+# ============================================================
+# TIMELINE LINE FORMATTER
+# ============================================================
 
-    # --------------------------------------------------------
-    # OVERNIGHT DIVIDER
-    # --------------------------------------------------------
+def format_timeline_line(paragraph, line):
 
-    elif "Overnight Journey" in stripped or "---" in stripped:
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-        new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Detect 12-hour timestamp
+    time_match = re.match(
+        r"^(\d{1,2}:\d{2}\s?(?:AM|PM))\s+(.*)$",
+        line.strip(),
+        re.IGNORECASE
+    )
 
-        r_div = new_p.add_run(stripped)
+    if time_match:
 
-        r_div.font.name = "Arial"
-        r_div.font.size = Pt(10)
-        r_div.font.color.rgb = RGBColor(100, 100, 100)
+        time_text = time_match.group(1)
+        event_text = time_match.group(2)
 
-    # --------------------------------------------------------
-    # TIMELINE EVENTS
-    # --------------------------------------------------------
+        # Bold timestamp
+        time_run = paragraph.add_run(
+            time_text + "\t"
+        )
+
+        time_run.font.name = FONT_NAME
+        time_run.font.size = Pt(11)
+        time_run.font.bold = True
+
+        # Normal event text
+        event_run = paragraph.add_run(
+            event_text
+        )
+
+        event_run.font.name = FONT_NAME
+        event_run.font.size = Pt(11)
 
     else:
 
-        new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-        # Detect time such as:
-        # 08:00 AM
-        # 10:30 PM
-        # 21:00 PM
-
-        time_match = re.match(
-            r"^(\d{1,2}:\d{2}\s?(?:AM|PM))\s+(.*)$",
-            stripped,
-            re.IGNORECASE
+        run = paragraph.add_run(
+            line.strip()
         )
 
-        if time_match:
-
-            time_text = time_match.group(1)
-            event_text = time_match.group(2)
-
-            r_time = new_p.add_run(time_text + "\t")
-
-            r_time.font.name = "Arial"
-            r_time.font.size = Pt(11)
-            r_time.font.bold = True
-
-            r_text = new_p.add_run(event_text)
-
-            r_text.font.name = "Arial"
-            r_text.font.size = Pt(11)
-
-        else:
-
-            r_txt = new_p.add_run(stripped)
-
-            r_txt.font.name = "Arial"
-            r_txt.font.size = Pt(11)
-
-    # Insert directly after current paragraph
-    curr_p._p.addnext(new_p._p)
-
-    return new_p
+        run.font.name = FONT_NAME
+        run.font.size = Pt(11)
 
 
 # ============================================================
-# PDF CONVERSION FUNCTION
+# ADD DETAILED ITINERARY LINE
+# ============================================================
+
+def append_styled_line(doc, current_paragraph, line):
+
+    stripped = line.strip()
+
+    if not stripped:
+        return current_paragraph
+
+    new_paragraph = doc.add_paragraph()
+
+
+    # ========================================================
+    # DAY HEADING
+    # ========================================================
+
+    if (
+        stripped.upper().startswith("DAY ")
+        and ":" in stripped
+    ):
+
+        numbers = re.findall(
+            r"\d+",
+            stripped
+        )
+
+        day_number = (
+            numbers[0]
+            if numbers
+            else "1"
+        )
+
+        format_day_heading(
+            new_paragraph,
+            day_number
+        )
+
+
+    # ========================================================
+    # SUB ROUTE
+    # ========================================================
+
+    elif stripped.upper().startswith("[SUB_ROUTE]"):
+
+        route_text = re.sub(
+            r"^\[SUB_ROUTE\]\s*",
+            "",
+            stripped,
+            flags=re.IGNORECASE
+        )
+
+        format_route(
+            new_paragraph,
+            route_text
+        )
+
+
+    # ========================================================
+    # OVERNIGHT DIVIDER
+    # ========================================================
+
+    elif (
+        "Overnight Journey" in stripped
+        or "---" in stripped
+    ):
+
+        new_paragraph.alignment = (
+            WD_ALIGN_PARAGRAPH.CENTER
+        )
+
+        run = new_paragraph.add_run(
+            stripped
+        )
+
+        run.font.name = FONT_NAME
+        run.font.size = Pt(10)
+        run.font.color.rgb = GREY_DIVIDER
+
+
+    # ========================================================
+    # NORMAL / TIMESTAMP EVENT
+    # ========================================================
+
+    else:
+
+        format_timeline_line(
+            new_paragraph,
+            stripped
+        )
+
+
+    # ========================================================
+    # INSERT AFTER CURRENT PARAGRAPH
+    # ========================================================
+
+    current_paragraph._p.addnext(
+        new_paragraph._p
+    )
+
+    return new_paragraph
+
+
+# ============================================================
+# FIND LIBREOFFICE
+# ============================================================
+
+def find_libreoffice():
+
+    possible_commands = [
+
+        # Linux / Streamlit Cloud
+        "libreoffice",
+
+        # Alternative Linux executable
+        "soffice",
+
+        # Windows installation
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+
+        # Windows 32-bit installation
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+
+        # User installation
+        os.path.expanduser(
+            r"~\AppData\Local\Programs\LibreOffice\program\soffice.exe"
+        )
+    ]
+
+
+    for command in possible_commands:
+
+        # Full path exists
+        if os.path.isfile(command):
+
+            return command
+
+        # Command exists in PATH
+        if shutil.which(command):
+
+            return shutil.which(command)
+
+
+    return None
+
+
+# ============================================================
+# CONVERT WORD → PDF
 # ============================================================
 
 def convert_docx_to_pdf(docx_bytes):
+
+    libreoffice = find_libreoffice()
+
+    if libreoffice is None:
+
+        raise RuntimeError(
+            "LibreOffice was not found. "
+            "Please install LibreOffice or add it to "
+            "the Streamlit deployment."
+        )
+
 
     with tempfile.TemporaryDirectory() as temp_dir:
 
@@ -208,14 +355,28 @@ def convert_docx_to_pdf(docx_bytes):
             "WNW_Itinerary.pdf"
         )
 
-        # Save temporary Word file
-        with open(docx_path, "wb") as f:
-            f.write(docx_bytes)
 
-        # Convert Word → PDF using LibreOffice
+        # ----------------------------------------------------
+        # SAVE TEMPORARY WORD FILE
+        # ----------------------------------------------------
+
+        with open(
+            docx_path,
+            "wb"
+        ) as file:
+
+            file.write(
+                docx_bytes
+            )
+
+
+        # ----------------------------------------------------
+        # CONVERT TO PDF
+        # ----------------------------------------------------
+
         process = subprocess.run(
             [
-                "libreoffice",
+                libreoffice,
                 "--headless",
                 "--convert-to",
                 "pdf",
@@ -228,25 +389,281 @@ def convert_docx_to_pdf(docx_bytes):
             text=True
         )
 
-        # Check conversion
+
+        # ----------------------------------------------------
+        # CHECK PROCESS
+        # ----------------------------------------------------
+
         if process.returncode != 0:
-            raise RuntimeError(
-                process.stderr or
-                "LibreOffice could not convert the document."
+
+            error_message = (
+                process.stderr.strip()
+                or process.stdout.strip()
+                or "LibreOffice conversion failed."
             )
+
+            raise RuntimeError(
+                error_message
+            )
+
+
+        # ----------------------------------------------------
+        # CHECK PDF
+        # ----------------------------------------------------
 
         if not os.path.exists(pdf_path):
+
             raise RuntimeError(
-                "PDF file was not created."
+                "LibreOffice completed, but "
+                "the PDF file was not created."
             )
 
-        # Read PDF
-        with open(pdf_path, "rb") as f:
-            return f.read()
+
+        # ----------------------------------------------------
+        # READ PDF
+        # ----------------------------------------------------
+
+        with open(
+            pdf_path,
+            "rb"
+        ) as file:
+
+            return file.read()
 
 
 # ============================================================
-# COMPILE BUTTON
+# PARSE ITINERARY
+# ============================================================
+
+def parse_itinerary(text):
+
+    lines = text.splitlines()
+
+    table_rows = []
+    detailed_lines = []
+    inclusions = []
+    exclusions = []
+
+    current_mode = "detailed"
+
+
+    for raw_line in lines:
+
+        line = raw_line.strip()
+
+
+        # ----------------------------------------------------
+        # BLOCK START / END
+        # ----------------------------------------------------
+
+        if "TABLE_START" in line:
+
+            current_mode = "table"
+            continue
+
+
+        if "TABLE_END" in line:
+
+            current_mode = "detailed"
+            continue
+
+
+        if "INCLUSIONS_START" in line:
+
+            current_mode = "inclusions"
+            continue
+
+
+        if "INCLUSIONS_END" in line:
+
+            current_mode = "detailed"
+            continue
+
+
+        if "EXCLUSIONS_START" in line:
+
+            current_mode = "exclusions"
+            continue
+
+
+        if "EXCLUSIONS_END" in line:
+
+            current_mode = "detailed"
+            continue
+
+
+        # ----------------------------------------------------
+        # SUMMARY TABLE
+        # ----------------------------------------------------
+
+        if current_mode == "table":
+
+            if "|" in line:
+
+                cells = [
+                    cell.strip()
+                    for cell in line.split("|")
+                    if cell.strip()
+                ]
+
+
+                # Ignore table header
+                if (
+                    len(cells) >= 2
+                    and cells[0].lower() != "day"
+                ):
+
+                    table_rows.append(
+                        cells
+                    )
+
+
+        # ----------------------------------------------------
+        # INCLUSIONS
+        # ----------------------------------------------------
+
+        elif current_mode == "inclusions":
+
+            if line:
+
+                inclusions.append(
+                    line
+                )
+
+
+        # ----------------------------------------------------
+        # EXCLUSIONS
+        # ----------------------------------------------------
+
+        elif current_mode == "exclusions":
+
+            if line:
+
+                exclusions.append(
+                    line
+                )
+
+
+        # ----------------------------------------------------
+        # DETAILED ITINERARY
+        # ----------------------------------------------------
+
+        else:
+
+            if line:
+
+                detailed_lines.append(
+                    line
+                )
+
+
+    return (
+        table_rows,
+        detailed_lines,
+        inclusions,
+        exclusions
+    )
+
+
+# ============================================================
+# CALCULATE TOUR ROUTE
+# ============================================================
+
+def calculate_tour_route(
+    table_rows,
+    start_city
+):
+
+    route_cities = []
+
+
+    for row in table_rows:
+
+        if len(row) <= 1:
+            continue
+
+
+        city_field = str(
+            row[1]
+        ).upper()
+
+
+        cleaned = (
+            city_field
+            .replace("[", "")
+            .replace("]", "")
+            .replace("'", "")
+            .replace('"', "")
+        )
+
+
+        cities = [
+            city.strip()
+            for city in cleaned.split("→")
+            if city.strip()
+        ]
+
+
+        for city in cities:
+
+            if city not in route_cities:
+
+                route_cities.append(
+                    city
+                )
+
+
+    if (
+        route_cities
+        and start_city.upper()
+        not in route_cities[-1]
+    ):
+
+        route_cities.append(
+            start_city.upper()
+        )
+
+
+    return " → ".join(
+        route_cities
+    )
+
+
+# ============================================================
+# PROCESS TABLE ROWS
+# ============================================================
+
+def process_table_rows(table_rows):
+
+    processed = []
+
+
+    for row in table_rows:
+
+        if len(row) >= 5:
+
+            # First four columns remain unchanged
+            # Everything after column 4 = meals
+            combined_meals = " | ".join(
+                row[4:]
+            )
+
+            processed.append(
+                row[:4] + [combined_meals]
+            )
+
+        else:
+
+            processed.append(
+                row
+            )
+
+
+    return processed
+
+
+# ============================================================
+# MAIN COMPILE BUTTON
 # ============================================================
 
 if st.button(
@@ -254,647 +671,546 @@ if st.button(
     type="primary"
 ):
 
+    # ========================================================
+    # CHECK INPUT
+    # ========================================================
+
     if not pasted_itinerary.strip():
 
         st.error(
             "Please paste the formatted itinerary text block first!"
         )
 
-    else:
+        st.stop()
 
-        try:
 
-            # =================================================
-            # LOAD MASTER TEMPLATE
-            # =================================================
+    try:
 
-            doc = Document("template.docx")
+        # ====================================================
+        # LOAD MASTER TEMPLATE
+        # ====================================================
 
-            lines = pasted_itinerary.splitlines()
+        doc = Document(
+            "template.docx"
+        )
 
-            table_rows_data = []
-            detailed_lines = []
-            inclusions = []
-            exclusions = []
 
-            current_mode = "detailed"
+        # ====================================================
+        # PARSE INPUT
+        # ====================================================
 
+        (
+            table_rows_data,
+            detailed_lines,
+            inclusions,
+            exclusions
+        ) = parse_itinerary(
+            pasted_itinerary
+        )
 
-            # =================================================
-            # PARSE INPUT BLOCKS
-            # =================================================
 
-            for line in lines:
+        # ====================================================
+        # CALCULATE ROUTE
+        # ====================================================
 
-                stripped_line = line.strip()
+        calculated_tour_route = calculate_tour_route(
+            table_rows_data,
+            start_city
+        )
 
-                if "TABLE_START" in stripped_line:
 
-                    current_mode = "table"
+        # ====================================================
+        # PROCESS TABLE
+        # ====================================================
 
-                    continue
+        processed_table_rows = process_table_rows(
+            table_rows_data
+        )
 
-                elif "TABLE_END" in stripped_line:
 
-                    current_mode = "detailed"
+        # ====================================================
+        # REPLACE TEMPLATE VARIABLES
+        # ====================================================
 
-                    continue
+        for paragraph in doc.paragraphs:
 
-                elif "INCLUSIONS_START" in stripped_line:
 
-                    current_mode = "inclusions"
+            # ------------------------------------------------
+            # SCHOOL NAME
+            # ------------------------------------------------
 
-                    continue
+            if "{{SCHOOL_NAME}}" in paragraph.text:
 
-                elif "INCLUSIONS_END" in stripped_line:
+                paragraph.text = paragraph.text.replace(
+                    "{{SCHOOL_NAME}}",
+                    school_name
+                )
 
-                    current_mode = "detailed"
 
-                    continue
+            # ------------------------------------------------
+            # DESTINATION
+            # ------------------------------------------------
 
-                elif "EXCLUSIONS_START" in stripped_line:
+            if "{{DESTINATION_NAME}}" in paragraph.text:
 
-                    current_mode = "exclusions"
+                paragraph.text = paragraph.text.replace(
+                    "{{DESTINATION_NAME}}",
+                    destination_name.upper()
+                )
 
-                    continue
 
-                elif "EXCLUSIONS_END" in stripped_line:
+            # ------------------------------------------------
+            # TOUR DURATION
+            # ------------------------------------------------
 
-                    current_mode = "detailed"
+            if "{{TOUR_DURATION}}" in paragraph.text:
 
-                    continue
+                paragraph.text = paragraph.text.replace(
+                    "{{TOUR_DURATION}}",
+                    tour_duration
+                )
 
 
-                # ---------------------------------------------
-                # SUMMARY TABLE
-                # ---------------------------------------------
+            # ------------------------------------------------
+            # TOUR ROUTE
+            # ------------------------------------------------
 
-                if current_mode == "table":
+            if "{{TOUR_ROUTE}}" in paragraph.text:
 
-                    if "|" in stripped_line:
-
-                        splits = [
-                            c.strip()
-                            for c in stripped_line.split("|")
-                            if c.strip()
-                        ]
-
-                        # Ignore accidental header row
-                        if (
-                            len(splits) >= 2
-                            and splits[0].lower() != "day"
-                        ):
-                            table_rows_data.append(splits)
-
-
-                # ---------------------------------------------
-                # INCLUSIONS
-                # ---------------------------------------------
-
-                elif current_mode == "inclusions":
-
-                    if stripped_line:
-                        inclusions.append(stripped_line)
-
-
-                # ---------------------------------------------
-                # EXCLUSIONS
-                # ---------------------------------------------
-
-                elif current_mode == "exclusions":
-
-                    if stripped_line:
-                        exclusions.append(stripped_line)
-
-
-                # ---------------------------------------------
-                # DETAILED ITINERARY
-                # ---------------------------------------------
-
-                else:
-
-                    if stripped_line:
-                        detailed_lines.append(stripped_line)
-
-
-            # =================================================
-            # CALCULATE TOUR ROUTE
-            # =================================================
-
-            calculated_tour_route = ""
-
-            if len(table_rows_data) > 0:
-
-                route_cities = []
-
-                for r_line in table_rows_data:
-
-                    if len(r_line) > 1:
-
-                        city_field = str(
-                            r_line[1]
-                        ).upper()
-
-                        cleaned_cell = (
-                            city_field
-                            .replace("[", "")
-                            .replace("]", "")
-                            .replace("'", "")
-                            .replace('"', "")
-                        )
-
-                        sub_cities = [
-                            c.strip()
-                            for c in cleaned_cell.split("→")
-                            if c.strip()
-                        ]
-
-                        for sc in sub_cities:
-
-                            if sc not in route_cities:
-
-                                route_cities.append(sc)
-
-
-                # Add starting city at end if required
-                if (
-                    len(route_cities) > 0
-                    and start_city.upper() not in route_cities[-1]
-                ):
-
-                    route_cities.append(
-                        start_city.upper()
-                    )
-
-
-                calculated_tour_route = " → ".join(
-                    route_cities
+                paragraph.text = paragraph.text.replace(
+                    "{{TOUR_ROUTE}}",
+                    calculated_tour_route
                 )
 
 
             # =================================================
-            # PROCESS SUMMARY TABLE
+            # INCLUSIONS
             # =================================================
 
-            processed_table_rows = []
+            if "{{TOUR_INCLUSIONS}}" in paragraph.text:
 
-            for r_line in table_rows_data:
+                paragraph.text = paragraph.text.replace(
+                    "{{TOUR_INCLUSIONS}}",
+                    ""
+                )
 
-                if len(r_line) >= 5:
+                paragraph.alignment = (
+                    WD_ALIGN_PARAGRAPH.LEFT
+                )
 
-                    # Everything after first 4 columns
-                    # belongs to meals
-                    combined_meals = " | ".join(
-                        r_line[4:]
-                    )
-
-                    processed_table_rows.append(
-                        r_line[:4] + [combined_meals]
-                    )
-
-                else:
-
-                    processed_table_rows.append(
-                        r_line
-                    )
+                current = paragraph
 
 
-            # =================================================
-            # REPLACE TEMPLATE PARAGRAPH VARIABLES
-            # =================================================
+                for item in inclusions:
 
-            for p in doc.paragraphs:
-
-                # ---------------------------------------------
-                # SCHOOL NAME
-                # ---------------------------------------------
-
-                if "{{SCHOOL_NAME}}" in p.text:
-
-                    p.text = p.text.replace(
-                        "{{SCHOOL_NAME}}",
-                        school_name
+                    clean_item = re.sub(
+                        r"^•\s*",
+                        "",
+                        item
                     )
 
 
-                # ---------------------------------------------
-                # DESTINATION
-                # ---------------------------------------------
-
-                if "{{DESTINATION_NAME}}" in p.text:
-
-                    p.text = p.text.replace(
-                        "{{DESTINATION_NAME}}",
-                        destination_name.upper()
+                    new_paragraph = doc.add_paragraph(
+                        clean_item,
+                        style="List Bullet"
                     )
 
 
-                # ---------------------------------------------
-                # DURATION
-                # ---------------------------------------------
-
-                if "{{TOUR_DURATION}}" in p.text:
-
-                    p.text = p.text.replace(
-                        "{{TOUR_DURATION}}",
-                        tour_duration
+                    new_paragraph.alignment = (
+                        WD_ALIGN_PARAGRAPH.LEFT
                     )
 
 
-                # ---------------------------------------------
-                # ROUTE
-                # ---------------------------------------------
+                    for run in new_paragraph.runs:
 
-                if "{{TOUR_ROUTE}}" in p.text:
+                        run.font.name = FONT_NAME
+                        run.font.size = Pt(10.5)
 
-                    p.text = p.text.replace(
-                        "{{TOUR_ROUTE}}",
-                        calculated_tour_route
+
+                    current._p.addnext(
+                        new_paragraph._p
                     )
 
-
-                # ---------------------------------------------
-                # INCLUSIONS
-                # ---------------------------------------------
-
-                if "{{TOUR_INCLUSIONS}}" in p.text:
-
-                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-                    p.text = p.text.replace(
-                        "{{TOUR_INCLUSIONS}}",
-                        ""
-                    )
-
-                    curr_inc_p = p
-
-                    for inc_line in inclusions:
-
-                        if not inc_line:
-                            continue
-
-                        # Remove existing bullet if supplied
-                        clean_inc = re.sub(
-                            r"^•\s*",
-                            "",
-                            inc_line
-                        )
-
-                        new_inc = doc.add_paragraph(
-                            clean_inc,
-                            style="List Bullet"
-                        )
-
-                        new_inc.alignment = (
-                            WD_ALIGN_PARAGRAPH.LEFT
-                        )
-
-                        for run in new_inc.runs:
-
-                            run.font.name = "Arial"
-                            run.font.size = Pt(10.5)
-
-                        curr_inc_p._p.addnext(
-                            new_inc._p
-                        )
-
-                        curr_inc_p = new_inc
-
-
-                # ---------------------------------------------
-                # EXCLUSIONS
-                # ---------------------------------------------
-
-                if "{{TOUR_EXCLUSIONS}}" in p.text:
-
-                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-                    p.text = p.text.replace(
-                        "{{TOUR_EXCLUSIONS}}",
-                        ""
-                    )
-
-                    curr_exc_p = p
-
-                    for exc_line in exclusions:
-
-                        if not exc_line:
-                            continue
-
-                        clean_exc = re.sub(
-                            r"^•\s*",
-                            "",
-                            exc_line
-                        )
-
-                        new_exc = doc.add_paragraph(
-                            clean_exc,
-                            style="List Bullet"
-                        )
-
-                        new_exc.alignment = (
-                            WD_ALIGN_PARAGRAPH.LEFT
-                        )
-
-                        for run in new_exc.runs:
-
-                            run.font.name = "Arial"
-                            run.font.size = Pt(10.5)
-
-                        curr_exc_p._p.addnext(
-                            new_exc._p
-                        )
-
-                        curr_exc_p = new_exc
-
-
-                # ---------------------------------------------
-                # DETAILED ITINERARY
-                # ---------------------------------------------
-
-                if "{{DETAILED_ITINERARY}}" in p.text:
-
-                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-                    p.text = p.text.replace(
-                        "{{DETAILED_ITINERARY}}",
-                        ""
-                    )
-
-                    curr_p = p
-
-                    for d_line in detailed_lines:
-
-                        curr_p = append_styled_line(
-                            doc,
-                            curr_p,
-                            d_line
-                        )
+                    current = new_paragraph
 
 
             # =================================================
-            # PROCESS TABLES
+            # EXCLUSIONS
             # =================================================
 
-            for table in doc.tables:
+            if "{{TOUR_EXCLUSIONS}}" in paragraph.text:
 
-                is_target = False
-                target_row_idx = -1
+                paragraph.text = paragraph.text.replace(
+                    "{{TOUR_EXCLUSIONS}}",
+                    ""
+                )
+
+                paragraph.alignment = (
+                    WD_ALIGN_PARAGRAPH.LEFT
+                )
+
+                current = paragraph
 
 
-                # ---------------------------------------------
-                # FIND ITINERARY SUMMARY TABLE
-                # ---------------------------------------------
+                for item in exclusions:
 
-                for r_idx, row in enumerate(
-                    table.rows
-                ):
+                    clean_item = re.sub(
+                        r"^•\s*",
+                        "",
+                        item
+                    )
 
-                    for cell in row.cells:
 
-                        if "{{DAY_NUM}}" in cell.text:
+                    new_paragraph = doc.add_paragraph(
+                        clean_item,
+                        style="List Bullet"
+                    )
 
-                            is_target = True
-                            target_row_idx = r_idx
 
-                            break
+                    new_paragraph.alignment = (
+                        WD_ALIGN_PARAGRAPH.LEFT
+                    )
 
-                    if is_target:
+
+                    for run in new_paragraph.runs:
+
+                        run.font.name = FONT_NAME
+                        run.font.size = Pt(10.5)
+
+
+                    current._p.addnext(
+                        new_paragraph._p
+                    )
+
+                    current = new_paragraph
+
+
+            # =================================================
+            # DETAILED ITINERARY
+            # =================================================
+
+            if "{{DETAILED_ITINERARY}}" in paragraph.text:
+
+                paragraph.text = paragraph.text.replace(
+                    "{{DETAILED_ITINERARY}}",
+                    ""
+                )
+
+                paragraph.alignment = (
+                    WD_ALIGN_PARAGRAPH.LEFT
+                )
+
+                current = paragraph
+
+
+                for line in detailed_lines:
+
+                    current = append_styled_line(
+                        doc,
+                        current,
+                        line
+                    )
+
+
+        # ====================================================
+        # PROCESS ALL TABLES
+        # ====================================================
+
+        for table in doc.tables:
+
+            target_table = False
+            target_row_index = -1
+
+
+            # ------------------------------------------------
+            # FIND SUMMARY TABLE
+            # ------------------------------------------------
+
+            for row_index, row in enumerate(
+                table.rows
+            ):
+
+                for cell in row.cells:
+
+                    if "{{DAY_NUM}}" in cell.text:
+
+                        target_table = True
+                        target_row_index = row_index
+
                         break
 
 
-                # ---------------------------------------------
-                # INSERT SUMMARY ROWS
-                # ---------------------------------------------
+                if target_table:
+                    break
 
-                if (
-                    is_target
-                    and target_row_idx != -1
+
+            # ------------------------------------------------
+            # INSERT SUMMARY TABLE ROWS
+            # ------------------------------------------------
+
+            if (
+                target_table
+                and target_row_index >= 0
+            ):
+
+                for index, row_data in enumerate(
+                    processed_table_rows
                 ):
 
-                    for idx, row_data in enumerate(
-                        processed_table_rows
+
+                    # First row uses template row
+                    if index == 0:
+
+                        new_row = table.rows[
+                            target_row_index
+                        ]
+
+                    else:
+
+                        new_row = table.add_row()
+
+
+                    # ----------------------------------------
+                    # WRITE CELLS
+                    # ----------------------------------------
+
+                    for cell_index in range(
+                        min(
+                            len(row_data),
+                            len(new_row.cells)
+                        )
                     ):
 
-                        if idx == 0:
-
-                            new_row = table.rows[
-                                target_row_idx
-                            ]
-
-                        else:
-
-                            new_row = table.add_row()
+                        cell_text = row_data[
+                            cell_index
+                        ]
 
 
-                        for i in range(
-                            min(
-                                len(row_data),
-                                len(new_row.cells)
-                            )
-                        ):
+                        # ------------------------------------
+                        # STACK MEALS VERTICALLY
+                        # ------------------------------------
 
-                            cell_text = row_data[i]
+                        if cell_index == 4:
 
-                            # Stack meals vertically
-                            if i == 4:
-
-                                cell_text = (
-                                    cell_text
-                                    .replace(
-                                        "L:",
-                                        "\nL:"
-                                    )
-                                    .replace(
-                                        "D:",
-                                        "\nD:"
-                                    )
-                                )
-
-                            new_row.cells[i].text = (
+                            cell_text = (
                                 cell_text
+                                .replace(
+                                    "B:",
+                                    "B:"
+                                )
+                                .replace(
+                                    "L:",
+                                    "\nL:"
+                                )
+                                .replace(
+                                    "D:",
+                                    "\nD:"
+                                )
                             )
 
 
-                            # ---------------------------------
-                            # FORMAT TABLE CELL
-                            # ---------------------------------
-
-                            for paragraph in (
-                                new_row.cells[i]
-                                .paragraphs
-                            ):
-
-                                for run in paragraph.runs:
-
-                                    run.font.name = "Arial"
-                                    run.font.size = Pt(9)
+                        new_row.cells[
+                            cell_index
+                        ].text = cell_text
 
 
-                # ---------------------------------------------
-                # OTHER TEMPLATE TABLE VARIABLES
-                # ---------------------------------------------
+                        # ------------------------------------
+                        # TABLE FONT
+                        # ------------------------------------
 
-                for row in table.rows:
+                        for p in new_row.cells[
+                            cell_index
+                        ].paragraphs:
 
-                    for cell in row.cells:
+                            for run in p.runs:
 
-                        # -------------------------------------
-                        # STUDENT COST
-                        # -------------------------------------
-
-                        if "{{STUDENT_COST}}" in cell.text:
-
-                            cell.text = cell.text.replace(
-                                "{{STUDENT_COST}}",
-                                ""
-                            )
-
-                            p_run = (
-                                cell.paragraphs[0]
-                                .add_run(student_cost)
-                            )
-
-                            p_run.font.name = "Arial"
-                            p_run.font.size = Pt(14)
-                            p_run.font.bold = True
-
-
-                        # -------------------------------------
-                        # GROUP STRENGTH
-                        # -------------------------------------
-
-                        if "{{GROUP_STRENGTH}}" in cell.text:
-
-                            cell.text = cell.text.replace(
-                                "{{GROUP_STRENGTH}}",
-                                group_strength
-                            )
-
-
-                        # -------------------------------------
-                        # TEACHER RATIO
-                        # -------------------------------------
-
-                        if "{{TEACHER_RATIO}}" in cell.text:
-
-                            cell.text = cell.text.replace(
-                                "{{TEACHER_RATIO}}",
-                                teacher_ratio
-                            )
+                                run.font.name = FONT_NAME
+                                run.font.size = Pt(9)
 
 
             # =================================================
-            # SAVE FINAL WORD DOCUMENT IN MEMORY
+            # PRICING VARIABLES
             # =================================================
 
-            bio = io.BytesIO()
+            for row in table.rows:
 
-            doc.save(bio)
-
-            docx_data = bio.getvalue()
+                for cell in row.cells:
 
 
-            # =================================================
-            # SUCCESS MESSAGE
-            # =================================================
+                    # -----------------------------------------
+                    # STUDENT COST
+                    # -----------------------------------------
+
+                    if "{{STUDENT_COST}}" in cell.text:
+
+                        cell.text = cell.text.replace(
+                            "{{STUDENT_COST}}",
+                            ""
+                        )
+
+
+                        run = (
+                            cell.paragraphs[0]
+                            .add_run(student_cost)
+                        )
+
+
+                        run.font.name = FONT_NAME
+                        run.font.size = Pt(14)
+                        run.font.bold = True
+
+
+                    # -----------------------------------------
+                    # GROUP STRENGTH
+                    # -----------------------------------------
+
+                    if "{{GROUP_STRENGTH}}" in cell.text:
+
+                        cell.text = cell.text.replace(
+                            "{{GROUP_STRENGTH}}",
+                            group_strength
+                        )
+
+
+                    # -----------------------------------------
+                    # TEACHER RATIO
+                    # -----------------------------------------
+
+                    if "{{TEACHER_RATIO}}" in cell.text:
+
+                        cell.text = cell.text.replace(
+                            "{{TEACHER_RATIO}}",
+                            teacher_ratio
+                        )
+
+
+        # ====================================================
+        # SAVE WORD DOCUMENT
+        # ====================================================
+
+        word_buffer = io.BytesIO()
+
+        doc.save(
+            word_buffer
+        )
+
+        word_data = word_buffer.getvalue()
+
+
+        # ====================================================
+        # WORD SUCCESS
+        # ====================================================
+
+        st.success(
+            "🎉 Final Word document compiled successfully!"
+        )
+
+
+        # ====================================================
+        # CREATE PDF
+        # ====================================================
+
+        pdf_data = None
+
+        try:
+
+            pdf_data = convert_docx_to_pdf(
+                word_data
+            )
 
             st.success(
-                "🎉 Final Word document compiled successfully!"
+                "📄 Final PDF document created successfully!"
             )
 
 
-            # =================================================
-            # PDF CONVERSION
-            # =================================================
+        except Exception as pdf_error:
 
-            try:
-
-                pdf_data = convert_docx_to_pdf(
-                    docx_data
-                )
-
-                st.success(
-                    "📄 PDF version created successfully!"
-                )
-
-
-                # ---------------------------------------------
-                # DOWNLOAD BUTTONS
-                # ---------------------------------------------
-
-                col1, col2 = st.columns(2)
-
-
-                with col1:
-
-                    st.download_button(
-                        label="💾 Download Word Document (.docx)",
-                        data=docx_data,
-                        file_name=(
-                            f"WNW_Itinerary_"
-                            f"{school_name.replace(' ', '_')}.docx"
-                        ),
-                        mime=(
-                            "application/"
-                            "vnd.openxmlformats-officedocument."
-                            "wordprocessingml.document"
-                        )
-                    )
-
-
-                with col2:
-
-                    st.download_button(
-                        label="📄 Download PDF Document (.pdf)",
-                        data=pdf_data,
-                        file_name=(
-                            f"WNW_Itinerary_"
-                            f"{school_name.replace(' ', '_')}.pdf"
-                        ),
-                        mime="application/pdf"
-                    )
-
-
-            # =================================================
-            # WORD SUCCESS BUT PDF FAILURE
-            # =================================================
-
-            except Exception as pdf_error:
-
-                st.warning(
-                    "Word document was created successfully, "
-                    "but PDF conversion failed."
-                )
-
-                st.error(
-                    f"PDF conversion error: {str(pdf_error)}"
-                )
-
-
-                # Still allow Word download
-
-                st.download_button(
-                    label="💾 Download Word Document (.docx)",
-                    data=docx_data,
-                    file_name=(
-                        f"WNW_Itinerary_"
-                        f"{school_name.replace(' ', '_')}.docx"
-                    ),
-                    mime=(
-                        "application/"
-                        "vnd.openxmlformats-officedocument."
-                        "wordprocessingml.document"
-                    )
-                )
-
-
-        # =====================================================
-        # GENERAL ERROR
-        # =====================================================
-
-        except Exception as e:
+            st.warning(
+                "Word document was created successfully, "
+                "but PDF conversion failed."
+            )
 
             st.error(
-                f"Error merging template data strings: {str(e)}"
+                f"PDF conversion error: {str(pdf_error)}"
             )
+
+
+        # ====================================================
+        # DOWNLOAD BUTTONS
+        # ====================================================
+
+        file_name_base = (
+            "WNW_Itinerary_"
+            + school_name.replace(" ", "_")
+        )
+
+
+        col1, col2 = st.columns(2)
+
+
+        # ====================================================
+        # WORD DOWNLOAD
+        # ====================================================
+
+        with col1:
+
+            st.download_button(
+                label="💾 Download Word Document (.docx)",
+                data=word_data,
+                file_name=(
+                    file_name_base
+                    + ".docx"
+                ),
+                mime=(
+                    "application/"
+                    "vnd.openxmlformats-officedocument."
+                    "wordprocessingml.document"
+                )
+            )
+
+
+        # ====================================================
+        # PDF DOWNLOAD
+        # ====================================================
+
+        with col2:
+
+            if pdf_data is not None:
+
+                st.download_button(
+                    label="📄 Download PDF Document (.pdf)",
+                    data=pdf_data,
+                    file_name=(
+                        file_name_base
+                        + ".pdf"
+                    ),
+                    mime="application/pdf"
+                )
+
+            else:
+
+                st.button(
+                    "📄 PDF Unavailable",
+                    disabled=True
+                )
+
+
+    # ========================================================
+    # MAIN ERROR HANDLER
+    # ========================================================
+
+    except FileNotFoundError:
+
+        st.error(
+            "❌ template.docx was not found. "
+            "Please keep template.docx in the same folder "
+            "as your Streamlit app."
+        )
+
+
+    except Exception as error:
+
+        st.error(
+            "❌ Error merging template data: "
+            + str(error)
+        )
