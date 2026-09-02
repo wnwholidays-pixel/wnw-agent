@@ -4,12 +4,10 @@ from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 
-# Page Configuration with Official Wings 'N' Wheels Corporate Identity
 st.set_page_config(page_title="WNW Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
 st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
 
-# 1. SIDEBAR INPUT CONTROLS
 with st.sidebar:
     st.header("📋 Booking Profile")
     school_name = st.text_input("School Name:", "AA School")
@@ -27,7 +25,6 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped: return curr_p
     new_p = doc.add_paragraph()
-    
     if stripped.upper().startswith("DAY ") and ":" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         day_part, _ = stripped.split(":", 1)
@@ -38,7 +35,6 @@ def append_styled_line(doc, curr_p, d_line):
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold = 'Arial', Pt(11), True
-        r_sub.font.italic = False 
         r_sub.font.color.rgb = RGBColor(0, 86, 179)
     elif "---" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -79,11 +75,12 @@ if st.button("Compile Official Word Proposal"):
                 else:
                     if current_mode == "table" and "|" in line:
                         splits = [c.strip() for c in line.split('|') if c.strip()]
-                        if len(splits) >= 5: 
-                            # FIXED MEAL ALIGNMENT LOGIC: Combines columns 5, 6, 7 using a dynamic new-line separator '\n' instead of normal spaces
-                            fixed_row = splits[:4] + ["\n".join(splits[4:])]
+                        if len(splits) >= 5:
+                            # CRITICAL FIX: Joins everything from the 5th column onward using clear New Line breaks
+                            meal_text = "\n".join(splits[4:])
+                            fixed_row = splits[:4] + [meal_text]
                             table_rows_data.append(fixed_row)
-                        else: 
+                        else:
                             table_rows_data.append(splits)
                     elif current_mode == "inclusions": inclusions.append(line.strip())
                     elif current_mode == "exclusions": exclusions.append(line.strip())
@@ -156,14 +153,14 @@ if st.button("Compile Official Word Proposal"):
                     for cell in row.cells:
                         if "{{STUDENT_COST}}" in cell.text: 
                             cell.text = cell.text.replace("{{STUDENT_COST}}", "")
-                            p_run = cell.paragraphs[0].add_run(student_cost)
+                            p_run = cell.paragraphs.add_run(student_cost)
                             p_run.font.name, p_run.font.size, p_run.font.bold = 'Arial', Pt(14), True
                         if "{{GROUP_STRENGTH}}" in cell.text: cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
                         if "{{TEACHER_RATIO}}" in cell.text: cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
 
             bio = io.BytesIO()
             doc.save(bio)
-            st.success("🎉 Final Document compiled perfectly with vertical stacked meal plans!")
+            st.success("🎉 Final Document compiled perfectly!")
             st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         except Exception as e:
             st.error(f"Error merging template data strings: {str(e)}")
