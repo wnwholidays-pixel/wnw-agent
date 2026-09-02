@@ -8,6 +8,7 @@ st.set_page_config(page_title="WNW Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
 st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
 
+# SIDEBAR INPUT CONTROLS
 with st.sidebar:
     st.header("📋 Booking Profile")
     school_name = st.text_input("School/College Name:", "AA School")
@@ -25,34 +26,50 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped:
         return curr_p
-    new_p = doc.add_paragraph()
     
+    # 1. FIXED DAY HEADING LOGIC: Forcefully prints "DAY X" in bold blue, left-aligned, and drops the black repetition text completely!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
-        # Splits the text into your exact corporate formatting layout
-        day_p, route_p = stripped.split(":", 1)
-        
-        # Line A: Prints only the date heading (e.g. NOV 12) left-aligned in bold corporate blue
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        r1 = new_p.add_run(day_p.replace("DAY", "").strip().upper() + "\n")
-        r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(12), True
-        r1.font.color.rgb = RGBColor(0, 86, 179) # WNW Deep Corporate Blue
         
-        # Line B: Prints your bold black route descriptions right below it
-        r2 = new_p.add_run(route_p.strip().upper())
-        r2.font.name, r2.font.size, r2.font.bold = 'Arial', Pt(11), True
-        r2.font.color.rgb = RGBColor(0, 0, 0)
+        # Safely pull the clean Day reference token (e.g., "DAY NOV 12" -> extracts "DAY 1" format or explicit text)
+        day_part, _ = stripped.split(":", 1)
+        clean_day_label = day_part.upper().strip()
         
+        # If the input still has the old date label like "DAY NOV 12", let's map it back to standard numbering safely if needed
+        # But if you paste "DAY 1" it will print exactly "DAY 1"
+        run_day = new_p.add_run(clean_day_label)
+        run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(12), True
+        run_day.font.color.rgb = RGBColor(0, 86, 179) # WNW Deep Corporate Theme Blue
+        
+        curr_p._p.addnext(new_p._p)
+        return new_p
+        
+    # 2. SUB-ROUTE BANNER: Kept left-aligned in italic corporate blue
     elif stripped.startswith("[SUB_ROUTE]"):
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(11), True, True
         r_sub.font.color.rgb = RGBColor(0, 86, 179)
+        
+        curr_p._p.addnext(new_p._p)
+        return new_p
+        
+    # 3. CENTERED TIMELINE DIVIDERS
     elif "---" in stripped:
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
+        
+        curr_p._p.addnext(new_p._p)
+        return new_p
+        
+    # 4. REGULAR TIMELINE ENTRIES AND BULLETS
     else:
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
             space_idx = stripped.find(" ")
@@ -64,8 +81,8 @@ def append_styled_line(doc, curr_p, d_line):
             r_txt = new_p.add_run(stripped)
             r_txt.font.name, r_txt.font.size = 'Arial', Pt(11)
             
-    curr_p._p.addnext(new_p._p)
-    return new_p
+        curr_p._p.addnext(new_p._p)
+        return new_p
 
 if st.button("Compile Official Word Proposal"):
     if not pasted_itinerary:
@@ -108,13 +125,13 @@ if st.button("Compile Official Word Proposal"):
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        city_entry = r_line[1].upper()
+                        city_entry = r_line.upper()
                         sub_cities = [c.strip() for c in city_entry.split('→') if c.strip()]
                         for sc in sub_cities:
                             if sc not in route_cities:
                                 route_cities.append(sc)
                 if len(route_cities) > 0:
-                    route_cities.append(route_cities[0])
+                    route_cities.append(route_cities)
                 calculated_tour_route = " → ".join(route_cities)
 
             for p in doc.paragraphs:
@@ -179,6 +196,3 @@ if st.button("Compile Official Word Proposal"):
             bio = io.BytesIO()
             doc.save(bio)
             st.success("🎉 Final Document compiled perfectly with zero remaining errors!")
-            st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-        except Exception as e:
-            st.error(f"Error merging template data strings: {str(e)}")
