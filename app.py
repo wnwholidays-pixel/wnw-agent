@@ -25,17 +25,23 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped: return curr_p
     new_p = doc.add_paragraph()
+    
+    # 1. CENTERED DAY HEADINGS: Upgraded directly to Font Size 16!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         day_part, _ = stripped.split(":", 1)
         r1 = new_p.add_run(day_part.upper().strip())
-        r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(12), True
+        r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(16), True
         r1.font.color.rgb = RGBColor(0, 86, 179)
+        
+    # 2. LEFT-ALIGNED SUB-ROUTE BANNER: Stripped away italics completely to stay straight bold blue!
     elif stripped.startswith("[SUB_ROUTE]"):
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
-        r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(11), True, True
+        r_sub.font.name, r_sub.font.size, r_sub.font.bold = 'Arial', Pt(11), True
+        r_sub.font.italic = False # Enforces standard straight corporate block letters
         r_sub.font.color.rgb = RGBColor(0, 86, 179)
+        
     elif "---" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
@@ -87,7 +93,7 @@ if st.button("Compile Official Word Proposal"):
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        sub_cities = [c.strip() for c in str(r_line[1]).upper().split('→') if c.strip()]
+                        sub_cities = [c.strip() for c in str(r_line).upper().split('→') if c.strip()]
                         for sc in sub_cities:
                             if sc not in route_cities: route_cities.append(sc)
                 if len(route_cities) > 0 and start_city.upper() not in route_cities[-1]:
