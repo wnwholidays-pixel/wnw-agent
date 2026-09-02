@@ -4,12 +4,10 @@ from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 
-# Page Configuration with Official Wings 'N' Wheels Corporate Identity
 st.set_page_config(page_title="WNW Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
 st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
 
-# 1. SIDEBAR INPUT CONTROLS
 with st.sidebar:
     st.header("📋 Booking Profile")
     school_name = st.text_input("School Name:", "AA School")
@@ -21,38 +19,28 @@ with st.sidebar:
     group_strength = st.text_input("Group Strength:", "45 (Minimum)")
     teacher_ratio = st.text_input("Teacher Ratio:", "15:01")
 
-st.markdown("### 📋 Paste the AI Text Output Block Below:")
 pasted_itinerary = st.text_area("Pasted Itinerary Body Text:", height=450)
 
 def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
-    if not stripped: 
-        return curr_p
+    if not stripped: return curr_p
     new_p = doc.add_paragraph()
-    
-    # FORMAT ANCHOR 1: CENTERED DAY HEADINGS (e.g. DAY 1)
     if stripped.upper().startswith("DAY ") and ":" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         day_part, _ = stripped.split(":", 1)
         r1 = new_p.add_run(day_part.upper().strip())
         r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(12), True
-        r1.font.color.rgb = RGBColor(0, 86, 179) # WNW Deep Corporate Theme Blue
-        
-    # FORMAT ANCHOR 2: LEFT-ALIGNED SUB-ROUTE BANNER
+        r1.font.color.rgb = RGBColor(0, 86, 179)
     elif stripped.startswith("[SUB_ROUTE]"):
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(11), True, True
         r_sub.font.color.rgb = RGBColor(0, 86, 179)
-        
-    # FORMAT ANCHOR 3: PERFECTLY CENTERED TIMELINE DIVIDERS
     elif "---" in stripped:
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
-        
-    # FORMAT ANCHOR 4: REGULAR LEFT-ALIGNED TIMESTAMPS & ENTRIES
     else:
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
@@ -64,7 +52,6 @@ def append_styled_line(doc, curr_p, d_line):
         else:
             r_txt = new_p.add_run(stripped)
             r_txt.font.name, r_txt.font.size = 'Arial', Pt(11)
-            
     curr_p._p.addnext(new_p._p)
     return new_p
 
@@ -78,70 +65,41 @@ if st.button("Compile Official Word Proposal"):
             table_rows_data, detailed_lines, inclusions, exclusions = [], [], [], []
             current_mode = "detailed"
             
-            # 2. PARSE COPIED DATA SECTIONS ACCORDING TO BLOCK MARKERS
             for line in lines:
-                if "TABLE_START" in line: 
-                    current_mode = "table"
-                    continue
-                elif "TABLE_END" in line: 
-                    current_mode = "detailed"
-                    continue
-                elif "INCLUSIONS_START" in line: 
-                    current_mode = "inclusions"
-                    continue
-                elif "INCLUSIONS_END" in line: 
-                    current_mode = "detailed"
-                    continue
-                elif "EXCLUSIONS_START" in line: 
-                    current_mode = "exclusions"
-                    continue
-                elif "EXCLUSIONS_END" in line: 
-                    current_mode = "detailed"
-                    continue
+                if "TABLE_START" in line: current_mode = "table"
+                elif "TABLE_END" in line: current_mode = "detailed"
+                elif "INCLUSIONS_START" in line: current_mode = "inclusions"
+                elif "INCLUSIONS_END" in line: current_mode = "detailed"
+                elif "EXCLUSIONS_START" in line: current_mode = "exclusions"
+                elif "EXCLUSIONS_END" in line: current_mode = "detailed"
                 else:
                     if current_mode == "table" and "|" in line:
                         splits = [c.strip() for c in line.split('|') if c.strip()]
-                        if len(splits) >= 5: 
-                            fixed_row = splits[:4] + ["  ".join(splits[4:])]
-                            table_rows_data.append(fixed_row)
-                        else: 
-                            table_rows_data.append(splits)
-                    elif current_mode == "inclusions": 
-                        inclusions.append(line.strip())
-                    elif current_mode == "exclusions": 
-                        exclusions.append(line.strip())
+                        if len(splits) >= 5: table_rows_data.append(splits[:4] + ["  ".join(splits[4:])])
+                        else: table_rows_data.append(splits)
+                    elif current_mode == "inclusions": inclusions.append(line.strip())
+                    elif current_mode == "exclusions": exclusions.append(line.strip())
                     else:
-                        if line.strip(): 
-                            detailed_lines.append(line)
+                        if line.strip(): detailed_lines.append(line)
 
-            # 3. BUILD CLEAN COMPACT LOOPS ROUTE STRING FOR PAGE 1 BANNER
             calculated_tour_route = ""
             if len(table_rows_data) > 0:
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        # Safely read cell data index 1 which contains the route loops map
-                        sub_cities = [c.strip() for c in r_line[1].upper().split('→') if c.strip()]
+                        sub_cities = [c.strip() for c in str(r_line[1]).upper().split('→') if c.strip()]
                         for sc in sub_cities:
-                            if sc not in route_cities: 
-                                route_cities.append(sc)
-                if len(route_cities) > 0 and start_city.upper() in route_cities:
-                    # Append the starting point back to the tail index to close the loop blueprint natively
+                            if sc not in route_cities: route_cities.append(sc)
+                if len(route_cities) > 0 and start_city.upper() not in route_cities[-1]:
                     route_cities.append(start_city.upper())
                 calculated_tour_route = " → ".join(route_cities)
 
-            # 4. SWAP TEXT PARAGRAPH LEVEL PLACEHOLDERS
             for p in doc.paragraphs:
-                if "{{SCHOOL_NAME}}" in p.text: 
-                    p.text = p.text.replace("{{SCHOOL_NAME}}", school_name)
-                if "{{DESTINATION_NAME}}" in p.text: 
-                    p.text = p.text.replace("{{DESTINATION_NAME}}", destination_name.upper())
-                if "{{TOUR_DURATION}}" in p.text: 
-                    p.text = p.text.replace("{{TOUR_DURATION}}", tour_duration)
-                if "{{TOUR_ROUTE}}" in p.text: 
-                    p.text = p.text.replace("{{TOUR_ROUTE}}", calculated_tour_route)
+                if "{{SCHOOL_NAME}}" in p.text: p.text = p.text.replace("{{SCHOOL_NAME}}", school_name)
+                if "{{DESTINATION_NAME}}" in p.text: p.text = p.text.replace("{{DESTINATION_NAME}}", destination_name.upper())
+                if "{{TOUR_DURATION}}" in p.text: p.text = p.text.replace("{{TOUR_DURATION}}", tour_duration)
+                if "{{TOUR_ROUTE}}" in p.text: p.text = p.text.replace("{{TOUR_ROUTE}}", calculated_tour_route)
                 
-                # Dynamic list injection handler for inclusions
                 if "{{TOUR_INCLUSIONS}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                     p.text = p.text.replace("{{TOUR_INCLUSIONS}}", "")
@@ -153,7 +111,6 @@ if st.button("Compile Official Word Proposal"):
                         curr_inc_p._p.addnext(new_inc._p)
                         curr_inc_p = new_inc
 
-                # Dynamic list injection handler for exclusions
                 if "{{TOUR_EXCLUSIONS}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                     p.text = p.text.replace("{{TOUR_EXCLUSIONS}}", "")
@@ -165,7 +122,6 @@ if st.button("Compile Official Word Proposal"):
                         curr_exc_p._p.addnext(new_exc._p)
                         curr_exc_p = new_exc
 
-                # Dynamic detailed itinerary handler line processing loops
                 if "{{DETAILED_ITINERARY}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                     p.text = p.text.replace("{{DETAILED_ITINERARY}}", "")
@@ -173,7 +129,6 @@ if st.button("Compile Official Word Proposal"):
                     for d_line in detailed_lines:
                         curr_p = append_styled_line(doc, curr_p, d_line)
 
-            # 5. DATA MATRIX GRID TABLES SYNC CHANNELS
             for table in doc.tables:
                 is_target, target_row_idx = False, -1
                 for r_idx, row in enumerate(table.rows):
@@ -191,11 +146,13 @@ if st.button("Compile Official Word Proposal"):
                 
                 for row in table.rows:
                     for cell in row.cells:
-                        if "{{STUDENT_COST}}" in cell.text: 
-                            cell.text = cell.text.replace("{{STUDENT_COST}}", student_cost)
-                        if "{{GROUP_STRENGTH}}" in cell.text: 
-                            cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
-                        if "{{TEACHER_RATIO}}" in cell.text: 
-                            cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
+                        if "{{STUDENT_COST}}" in cell.text: cell.text = cell.text.replace("{{STUDENT_COST}}", student_cost)
+                        if "{{GROUP_STRENGTH}}" in cell.text: cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
+                        if "{{TEACHER_RATIO}}" in cell.text: cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
 
-            # 6. EXPORT OUT BUFFER CHANNELS
+            bio = io.BytesIO()
+            doc.save(bio)
+            st.success("🎉 Final Document compiled perfectly with zero remaining errors!")
+            st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        except Exception as e:
+            st.error(f"Error merging template data strings: {str(e)}")
