@@ -25,54 +25,27 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped: return curr_p
     
-    # 1. FIXED DAY HEADING LOGIC: Forces clean "DAY X" centering, Font Size 14, and vibrant Sky Blue color. Eliminates repetitions!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
         new_p = doc.add_paragraph()
-        # Enforces dead-center alignment
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # Split on colon and take only the first token (e.g., extracts "DAY 1" or "DAY 2")
         day_part, _ = stripped.split(":", 1)
-        clean_day_label = day_part.upper().strip()
+        clean_day_label = day_part.upper().replace("DAY", "").strip()
         
-        # Double check to prevent internal repeating terms like "DAY 1 DAY 1" from the text block
-        if "DAY " in clean_day_label[4:]:
-            clean_day_label = clean_day_label.split("DAY")[0].strip()
-            if not clean_day_label.startswith("DAY"):
-                clean_day_label = "DAY " + clean_day_label
-                
-        run_day = new_p.add_run(clean_day_label)
-        run_day.font.name = 'Arial'
-        run_day.font.size = Pt(14) # Locked to Font Size 14
-        run_day.font.bold = True
+        run_day = new_p.add_run(f"DAY {clean_day_label}")
+        run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(14), True
         run_day.font.color.rgb = RGBColor(0, 163, 224) # Official Vibrant WNW Sky Blue
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 2. SUB-ROUTE BANNER: Stays perfectly Left-Aligned in bold blue
     elif stripped.startswith("[SUB_ROUTE]"):
         new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold = 'Arial', Pt(11), True
-        r_sub.font.color.rgb = RGBColor(0, 86, 179) # Keep route lines in professional deep blue
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 3. CENTERED TIMELINE DIVIDERS
+        r_sub.font.color.rgb = RGBColor(0, 86, 179)
     elif "---" in stripped:
         new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 4. REGULAR TIMELINE TIMESTAMPS AND BULLETS
     else:
         new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -86,8 +59,8 @@ def append_styled_line(doc, curr_p, d_line):
             r_txt = new_p.add_run(stripped)
             r_txt.font.name, r_txt.font.size = 'Arial', Pt(11)
             
-        curr_p._p.addnext(new_p._p)
-        return new_p
+    curr_p._p.addnext(new_p._p)
+    return new_p
 
 if st.button("Compile Official Word Proposal"):
     if not pasted_itinerary:
@@ -98,16 +71,8 @@ if st.button("Compile Official Word Proposal"):
             lines = pasted_itinerary.split('\n')
             table_rows_data, detailed_lines, inclusions, exclusions = [], [], [], []
             current_mode = "detailed"
-            skip_next_line = False
             
             for line in lines:
-                if "📢 CLIENT VERIFICATION SCRIPT" in line:
-                    skip_next_line = True
-                    continue
-                if skip_next_line and line.strip().startswith('"'):
-                    skip_next_line = False
-                    continue
-                    
                 if "TABLE_START" in line: current_mode = "table"
                 elif "TABLE_END" in line: current_mode = "detailed"
                 elif "INCLUSIONS_START" in line: current_mode = "inclusions"
@@ -117,11 +82,8 @@ if st.button("Compile Official Word Proposal"):
                 else:
                     if current_mode == "table" and "|" in line:
                         splits = [c.strip() for c in line.split('|') if c.strip()]
-                        if len(splits) >= 5:
-                            combined_meals = " ".join(splits[4:])
-                            table_rows_data.append(splits[:4] + [combined_meals])
-                        else:
-                            table_rows_data.append(splits)
+                        if len(splits) >= 5: table_rows_data.append(splits[:4] + [" ".join(splits[4:])])
+                        else: table_rows_data.append(splits)
                     elif current_mode == "inclusions": inclusions.append(line.strip())
                     elif current_mode == "exclusions": exclusions.append(line.strip())
                     else:
@@ -132,8 +94,7 @@ if st.button("Compile Official Word Proposal"):
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        raw_city_cell = str(r_line).upper()
-                        cleaned_cell = raw_city_cell.replace('[', '').replace(']', '').replace("'", "").replace('"', '')
+                        cleaned_cell = str(r_line).upper().replace('[', '').replace(']', '').replace("'", "").replace('', '')
                         sub_cities = [c.strip() for c in cleaned_cell.split('→') if c.strip()]
                         for sc in sub_cities:
                             if sc not in route_cities: route_cities.append(sc)
@@ -198,3 +159,14 @@ if st.button("Compile Official Word Proposal"):
                     for cell in row.cells:
                         if "{{STUDENT_COST}}" in cell.text: 
                             cell.text = cell.text.replace("{{STUDENT_COST}}", "")
+                            p_run = cell.paragraphs[0].add_run(student_cost)
+                            p_run.font.name, p_run.font.size, p_run.font.bold = 'Arial', Pt(14), True
+                        if "{{GROUP_STRENGTH}}" in cell.text: cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
+                        if "{{TEACHER_RATIO}}" in cell.text: cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
+
+            bio = io.BytesIO()
+            doc.save(bio)
+            st.success("🎉 Final Document compiled perfectly!")
+            st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        except Exception as e:
+            st.error(f"Error merging template data strings: {str(e)}")
