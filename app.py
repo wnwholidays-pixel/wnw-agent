@@ -8,7 +8,7 @@ st.set_page_config(page_title="WNW Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
 st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
 
-# 1. SIDEBAR INPUT CONTROLS
+# SIDEBAR INPUT CONTROLS
 with st.sidebar:
     st.header("📋 Booking Profile")
     school_name = st.text_input("School/College Name:", "AA School")
@@ -85,7 +85,8 @@ if st.button("Compile Official Word Proposal"):
                         else: table_rows_data.append(splits)
                     elif current_mode == "inclusions": inclusions.append(line.strip())
                     elif current_mode == "exclusions": exclusions.append(line.strip())
-                    else: detailed_lines.append(line)
+                    else: 
+                        if line.strip(): detailed_lines.append(line)
 
             for p in doc.paragraphs:
                 if "{{SCHOOL_NAME}}" in p.text: p.text = p.text.replace("{{SCHOOL_NAME}}", school_name)
@@ -93,8 +94,11 @@ if st.button("Compile Official Word Proposal"):
                 if "{{TOUR_DURATION}}" in p.text: p.text = p.text.replace("{{TOUR_DURATION}}", tour_duration)
                 if "{{TOUR_ROUTE}}" in p.text:
                     for r_line in table_rows_data:
-                        if len(r_line) > 1 and ("DAY 1" in r_line.upper() or "NOV" in r_line.upper()): 
-                            p.text = p.text.replace("{{TOUR_ROUTE}}", r_line.upper())
+                        # SMART FIX: Converts the whole row to a single upper line check to find day 1 route cleanly
+                        combined_row_string = " ".join(r_line).upper()
+                        if "DAY 1" in combined_row_string or "NOV" in combined_row_string: 
+                            if len(r_line) > 1:
+                                p.text = p.text.replace("{{TOUR_ROUTE}}", r_line[1].upper())
                 
                 if "{{TOUR_INCLUSIONS}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
