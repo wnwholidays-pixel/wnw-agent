@@ -104,7 +104,6 @@ if st.button("Compile Official Word Proposal"):
                         if not stripped_line:
                             continue
                             
-                        # Build a brand new paragraph line element
                         new_p = doc.add_paragraph()
                         
                         # FORMAT ANCHOR 1: STYLING THE DAY TITLES IN BLUE
@@ -112,14 +111,12 @@ if st.button("Compile Official Word Proposal"):
                             new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                             day_part, route_part = stripped_line.split(":", 1)
                             
-                            # Add centered "DAY X" in Corporate Blue
                             run_day = new_p.add_run(day_part.upper() + "\n")
                             run_day.font.name = 'Arial'
                             run_day.font.size = Pt(14)
                             run_day.font.bold = True
                             run_day.font.color.rgb = RGBColor(0, 163, 224) # Exact WNW Sky Blue
                             
-                            # Add bold centered main route title
                             run_route = new_p.add_run(route_part.strip().upper())
                             run_route.font.name = 'Arial'
                             run_route.font.size = Pt(14)
@@ -147,7 +144,6 @@ if st.button("Compile Official Word Proposal"):
                         # FORMAT ANCHOR 4: REGULAR TIMELINE ENTRIES
                         else:
                             new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                            # Split timestamps safely if present to bold them on the left
                             if len(stripped_line) > 5 and stripped_line[0:2].isdigit() and ":" in stripped_line:
                                 space_idx = stripped_line.find(" ")
                                 time_part = stripped_line[:space_idx]
@@ -171,8 +167,16 @@ if st.button("Compile Official Word Proposal"):
 
             # SWAP TABLES GRID FOR HIGHLIGHTS AND PRICING
             for table in doc.tables:
-                if len(table.rows) > 1 and "{{DAY_NUM}}" in table.rows.cells[index].text for index in range(len(table.rows.cells)):
-                    base_row = table.rows
+                # FIXED LOOP: Scan cleanly across all cells inside row 1 to see if the tag exists
+                is_target_table = False
+                if len(table.rows) > 1:
+                    for check_cell in table.rows[1].cells:
+                        if "{{DAY_NUM}}" in check_cell.text:
+                            is_target_table = True
+                            break
+                
+                if is_target_table:
+                    base_row = table.rows[1]
                     for index, row_data in enumerate(table_rows_data):
                         if index == 0:
                             new_row = base_row
