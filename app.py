@@ -6,15 +6,14 @@ import io
 
 st.set_page_config(page_title="WNW Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
-st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
+st.caption("Official Production Studio - Template Merger Engine (.docx)")
 
-# SIDEBAR INPUT CONTROLS
 with st.sidebar:
     st.header("📋 Booking Profile")
-    school_name = st.text_input("School/College Name:", "AA School")
-    start_city = st.text_input("Starting From City:", "Jaipur")
+    school_name = st.text_input("School Name:", "AA School")
+    start_city = st.text_input("Starting From:", "Jaipur")
     destination_name = st.text_input("Destination Label:", "CHANDIGARH – MANALI")
-    tour_duration = st.text_input("Tour Duration Frame:", "6 Nights / 7 Days")
+    tour_duration = st.text_input("Duration Frame:", "6 Nights / 7 Days")
     st.header("💰 Pricing Matrix")
     student_cost = st.text_input("Cost Per Student:", "Rs. 13,500/-")
     group_strength = st.text_input("Group Strength:", "45 (Minimum)")
@@ -24,52 +23,25 @@ pasted_itinerary = st.text_area("Pasted Itinerary Body Text:", height=450)
 
 def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
-    if not stripped:
-        return curr_p
-    
-    # 1. FIXED DAY HEADING LOGIC: Forcefully prints "DAY X" in bold blue, left-aligned, and drops the black repetition text completely!
+    if not stripped: return curr_p
+    new_p = doc.add_paragraph()
     if stripped.upper().startswith("DAY ") and ":" in stripped:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        
-        # Safely pull the clean Day reference token (e.g., "DAY NOV 12" -> extracts "DAY 1" format or explicit text)
         day_part, _ = stripped.split(":", 1)
-        clean_day_label = day_part.upper().strip()
-        
-        # If the input still has the old date label like "DAY NOV 12", let's map it back to standard numbering safely if needed
-        # But if you paste "DAY 1" it will print exactly "DAY 1"
-        run_day = new_p.add_run(clean_day_label)
-        run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(12), True
-        run_day.font.color.rgb = RGBColor(0, 86, 179) # WNW Deep Corporate Theme Blue
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 2. SUB-ROUTE BANNER: Kept left-aligned in italic corporate blue
+        r1 = new_p.add_run(day_part.upper().strip())
+        r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(12), True
+        r1.font.color.rgb = RGBColor(0, 86, 179)
     elif stripped.startswith("[SUB_ROUTE]"):
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(11), True, True
         r_sub.font.color.rgb = RGBColor(0, 86, 179)
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 3. CENTERED TIMELINE DIVIDERS
     elif "---" in stripped:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
-        
-        curr_p._p.addnext(new_p._p)
-        return new_p
-        
-    # 4. REGULAR TIMELINE ENTRIES AND BULLETS
     else:
-        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
             space_idx = stripped.find(" ")
@@ -80,9 +52,8 @@ def append_styled_line(doc, curr_p, d_line):
         else:
             r_txt = new_p.add_run(stripped)
             r_txt.font.name, r_txt.font.size = 'Arial', Pt(11)
-            
-        curr_p._p.addnext(new_p._p)
-        return new_p
+    curr_p._p.addnext(new_p._p)
+    return new_p
 
 if st.button("Compile Official Word Proposal"):
     if not pasted_itinerary:
@@ -93,16 +64,8 @@ if st.button("Compile Official Word Proposal"):
             lines = pasted_itinerary.split('\n')
             table_rows_data, detailed_lines, inclusions, exclusions = [], [], [], []
             current_mode = "detailed"
-            skip_next_line = False
             
             for line in lines:
-                if "📢 CLIENT VERIFICATION SCRIPT" in line:
-                    skip_next_line = True
-                    continue
-                if skip_next_line and line.strip().startswith('"'):
-                    skip_next_line = False
-                    continue
-                    
                 if "TABLE_START" in line: current_mode = "table"
                 elif "TABLE_END" in line: current_mode = "detailed"
                 elif "INCLUSIONS_START" in line: current_mode = "inclusions"
@@ -116,30 +79,25 @@ if st.button("Compile Official Word Proposal"):
                         else: table_rows_data.append(splits)
                     elif current_mode == "inclusions": inclusions.append(line.strip())
                     elif current_mode == "exclusions": exclusions.append(line.strip())
-                    else: 
+                    else:
                         if line.strip(): detailed_lines.append(line)
 
-            # FIND CLEAN COMPACT LOOPING ROUTE BANNER MAP FOR PAGE 1
             calculated_tour_route = ""
             if len(table_rows_data) > 0:
                 route_cities = []
                 for r_line in table_rows_data:
                     if len(r_line) > 1:
-                        city_entry = r_line.upper()
-                        sub_cities = [c.strip() for c in city_entry.split('→') if c.strip()]
+                        sub_cities = [c.strip() for c in r_line[1].upper().split('→') if c.strip()]
                         for sc in sub_cities:
-                            if sc not in route_cities:
-                                route_cities.append(sc)
-                if len(route_cities) > 0:
-                    route_cities.append(route_cities)
+                            if sc not in route_cities: route_cities.append(sc)
+                if len(route_cities) > 0: route_cities.append(route_cities[0])
                 calculated_tour_route = " → ".join(route_cities)
 
             for p in doc.paragraphs:
                 if "{{SCHOOL_NAME}}" in p.text: p.text = p.text.replace("{{SCHOOL_NAME}}", school_name)
                 if "{{DESTINATION_NAME}}" in p.text: p.text = p.text.replace("{{DESTINATION_NAME}}", destination_name.upper())
                 if "{{TOUR_DURATION}}" in p.text: p.text = p.text.replace("{{TOUR_DURATION}}", tour_duration)
-                if "{{TOUR_ROUTE}}" in p.text:
-                    p.text = p.text.replace("{{TOUR_ROUTE}}", calculated_tour_route)
+                if "{{TOUR_ROUTE}}" in p.text: p.text = p.text.replace("{{TOUR_ROUTE}}", calculated_tour_route)
                 
                 if "{{TOUR_INCLUSIONS}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -171,22 +129,17 @@ if st.button("Compile Official Word Proposal"):
                         curr_p = append_styled_line(doc, curr_p, d_line)
 
             for table in doc.tables:
-                is_target = False
-                target_row_idx = -1
+                is_target, target_row_idx = False, -1
                 for r_idx, row in enumerate(table.rows):
                     for cell in row.cells:
                         if "{{DAY_NUM}}" in cell.text:
-                            is_target = True
-                            target_row_idx = r_idx
+                            is_target, target_row_idx = True, r_idx
                             break
                     if is_target: break
-                
                 if is_target and target_row_idx != -1:
                     for idx, row_data in enumerate(table_rows_data):
                         new_row = table.rows[target_row_idx] if idx == 0 else table.add_row()
-                        for i in range(min(len(row_data), len(new_row.cells))):
-                            new_row.cells[i].text = row_data[i]
-                
+                        for i in range(min(len(row_data), len(new_row.cells))): new_row.cells[i].text = row_data[i]
                 for row in table.rows:
                     for cell in row.cells:
                         if "{{STUDENT_COST}}" in cell.text: cell.text = cell.text.replace("{{STUDENT_COST}}", student_cost)
@@ -195,4 +148,7 @@ if st.button("Compile Official Word Proposal"):
 
             bio = io.BytesIO()
             doc.save(bio)
-            st.success("🎉 Final Document compiled perfectly with zero remaining errors!")
+            st.success("🎉 Final Document compiled perfectly!")
+            st.download_button(label="💾 Download Client Word Document (.docx)", data=bio.getvalue(), file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        except Exception as e:
+            st.error(f"Error merging template data strings: {str(e)}")
