@@ -1,11 +1,9 @@
 import streamlit as st
 import google.generativeai as genai
-from audiorecorder import audiorecorder
 
 # Page Configuration with Official Corporate Blue Identity
 st.set_page_config(page_title="WNW Holidays Itinerary Engine", layout="wide")
 
-# Theme styling anchors matching your professional documents
 st.markdown("""
     <style>
     .reportview-container { background: #f0f5fa; }
@@ -15,7 +13,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🦅 Wings 'N' Wheels Holidays")
-st.caption("Official Multi-Step Voice AI Itinerary Automation Engine")
+st.caption("Official Native Voice AI Itinerary Automation Engine")
 
 # 1. FIXED MASTER ITINERARY DATABASE (HARDCODED FROM YOUR UPLOADED FILE TEMPLATES)
 MASTER_PACKAGES = {
@@ -55,21 +53,20 @@ if "step" not in st.session_state:
     st.session_state.step = 1
     st.session_state.trip_data = {}
 
-# STEP 1: PARSE INITIAL REQUIREMENTS VIA VOICE/TEXT
+# STEP 1: PARSE INITIAL REQUIREMENTS VIA NATIVE VOICE/TEXT
 if st.session_state.step == 1:
     st.subheader("📍 Step 1: Core Target Logistics & Package Blueprint")
     
     api_input = st.text_input("Enter your Gemini API Key to wake up the agent:", type="password")
     selected_pack = st.selectbox("Select Target Master Itinerary Template:", list(MASTER_PACKAGES.keys()))
     
-    st.markdown("### 🎙️ Voice Input (Microphone Interface)")
-    st.info("Tap the button below and state your basic parameters (e.g., 'Starting from Pali, train time 17:00 from Ajmer station')")
+    st.markdown("### 🎙️ Native Voice Input")
+    st.info("Tap the microphone circle below to speak your route requirements aloud (e.g., 'Starting from Pali, train at 17:00 from Ajmer station')")
     
-    # Live recording element frame
-    audio = audiorecorder("Click to Record Voice", "Click to Stop and Save Audio")
-    if len(audio) > 0:
-        st.audio(audio.export().read())
-        st.success("Voice sample securely captured! Verify the structural fields below:")
+    # Official native stable audio input handler
+    voice_audio = st.audio_input("Record audio notes here")
+    if voice_audio:
+        st.success("Voice note captured securely! Confirm the textual adjustments below:")
 
     start_place = st.text_input("Client's Starting Location / Campus Point:", "Pali")
     boarding_hub = st.text_input("Boarding Hub Station (If Train/Flight trip):", "Ajmer")
@@ -85,11 +82,10 @@ if st.session_state.step == 1:
                 "hub": boarding_hub, "train_time": train_time
             })
             
-            # Smart conditional branching for cross-city transfer check
             if start_place.lower() != boarding_hub.lower() and "Kumbhalgarh" not in selected_pack:
-                st.session_state.step = 2  # Discrepancy loop triggered
+                st.session_state.step = 2
             else:
-                st.session_state.step = 3  # Direct compile block
+                st.session_state.step = 3
             st.rerun()
 
 # STEP 2: ROUTING DISCREPANCY FLOW BUFFER
@@ -98,7 +94,7 @@ if st.session_state.step == 2:
     st.info("🗺️ Operational Parameter: Road distance spans approximately 170 KM. Appending a 3-hour local transit window before the scheduled departure.")
     
     st.markdown("### 🎙️ Speak the Transition Plan:")
-    audio_gap = audiorecorder("Record Transition Note", "Stop Transition Note")
+    voice_gap = st.audio_input("Record connecting bus routing details here")
     
     transfer_method = st.text_input("Verify transfer text notation here:", "By luxury campus tour coach bus connection")
     client_count = st.number_input("Minimum Group Student Headcount:", min_value=1, value=45)
