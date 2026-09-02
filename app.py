@@ -1,5 +1,7 @@
 import streamlit as st
 from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 
 # Page Configuration with Official Blue Identity
@@ -8,7 +10,7 @@ st.set_page_config(page_title="WNW Master Template Engine", layout="wide")
 st.title("🦅 Wings 'N' Wheels Holidays")
 st.caption("Official Production Studio - Final Master Template Merger Engine (.docx)")
 
-# 1. SIDEBAR INPUT CONTROLS FOR DIRECT BALANCING
+# Sidebar inputs
 with st.sidebar:
     st.header("📋 Booking Profile")
     school_name = st.text_input("School/College Name:", "AA School")
@@ -36,8 +38,6 @@ if st.button("Compile Official Word Proposal"):
             detailed_itinerary_lines = []
             inclusions_data = []
             exclusions_data = []
-            
-            # Internal routing matrix tags
             current_mode = "detailed"
             
             for line in lines:
@@ -62,19 +62,20 @@ if st.button("Compile Official Word Proposal"):
                 
                 if current_mode == "table":
                     if "|" in line:
-                        table_rows_data.append([cell.strip() for cell in line.split('|')])
+                        raw_splits = [cell.strip() for cell in line.split('|') if cell.strip()]
+                        if len(raw_splits) >= 5:
+                            fixed_row = raw_splits[:4] + ["  ".join(raw_splits[4:])]
+                            table_rows_data.append(fixed_row)
+                        else:
+                            table_rows_data.append(raw_splits)
                 elif current_mode == "inclusions":
                     inclusions_data.append(line)
                 elif current_mode == "exclusions":
                     exclusions_data.append(line)
                 else:
                     detailed_itinerary_lines.append(line)
-            
-            clean_body_text = "\n".join(detailed_itinerary_lines)
-            clean_inclusions = "\n".join(inclusions_data)
-            clean_exclusions = "\n".join(exclusions_data)
 
-            # SWAP PARAGRAPH LEVEL TAGS
+            # SWAP PARAGRAPH LEVEL TAGS WITH ADVANCED COLOR AND DESIGN LOGIC
             for paragraph in doc.paragraphs:
                 if "{{SCHOOL_NAME}}" in paragraph.text:
                     paragraph.text = paragraph.text.replace("{{SCHOOL_NAME}}", school_name)
@@ -84,22 +85,97 @@ if st.button("Compile Official Word Proposal"):
                     paragraph.text = paragraph.text.replace("{{TOUR_DURATION}}", tour_duration)
                 if "{{TOUR_ROUTE}}" in paragraph.text:
                     for line in table_rows_data:
-                        if "Day 1" in line:
-                            paragraph.text = paragraph.text.replace("{{TOUR_ROUTE}}", line[1].upper())
-                if "{{DETAILED_ITINERARY}}" in paragraph.text:
-                    paragraph.text = paragraph.text.replace("{{DETAILED_ITINERARY}}", clean_body_text)
+                        if "Day 1" in line or "Nov 12" in line:
+                            paragraph.text = paragraph.text.replace("{{TOUR_ROUTE}}", line.upper())
+                
                 if "{{TOUR_INCLUSIONS}}" in paragraph.text:
-                    paragraph.text = paragraph.text.replace("{{TOUR_INCLUSIONS}}", clean_inclusions)
+                    paragraph.text = paragraph.text.replace("{{TOUR_INCLUSIONS}}", "\n".join(inclusions_data))
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 if "{{TOUR_EXCLUSIONS}}" in paragraph.text:
-                    paragraph.text = paragraph.text.replace("{{TOUR_EXCLUSIONS}}", clean_exclusions)
+                    paragraph.text = paragraph.text.replace("{{TOUR_EXCLUSIONS}}", "\n".join(exclusions_data))
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                
+                if "{{DETAILED_ITINERARY}}" in paragraph.text:
+                    paragraph.text = paragraph.text.replace("{{DETAILED_ITINERARY}}", "")
+                    current_para = paragraph
+                    
+                    for idx, d_line in enumerate(detailed_itinerary_lines):
+                        stripped_line = d_line.strip()
+                        if not stripped_line:
+                            continue
+                            
+                        # Build a brand new paragraph line element
+                        new_p = doc.add_paragraph()
+                        
+                        # FORMAT ANCHOR 1: STYLING THE DAY TITLES IN BLUE
+                        if stripped_line.upper().startswith("DAY ") and ":" in stripped_line:
+                            new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            day_part, route_part = stripped_line.split(":", 1)
+                            
+                            # Add centered "DAY X" in Corporate Blue
+                            run_day = new_p.add_run(day_part.upper() + "\n")
+                            run_day.font.name = 'Arial'
+                            run_day.font.size = Pt(14)
+                            run_day.font.bold = True
+                            run_day.font.color.rgb = RGBColor(0, 163, 224) # Exact WNW Sky Blue
+                            
+                            # Add bold centered main route title
+                            run_route = new_p.add_run(route_part.strip().upper())
+                            run_route.font.name = 'Arial'
+                            run_route.font.size = Pt(14)
+                            run_route.font.bold = True
+                            run_route.font.color.rgb = RGBColor(0, 0, 0)
+                            
+                        # FORMAT ANCHOR 2: STYLING THE DRIVING SUB-ROUTES IN ITALIC BLUE
+                        elif stripped_line.startswith("[SUB_ROUTE]"):
+                            new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            run_sub = new_p.add_run(stripped_line.replace("[SUB_ROUTE]", "").strip())
+                            run_sub.font.name = 'Arial'
+                            run_sub.font.size = Pt(10.5)
+                            run_sub.font.bold = True
+                            run_sub.font.italic = True
+                            run_sub.font.color.rgb = RGBColor(0, 163, 224)
+                            
+                        # FORMAT ANCHOR 3: STYLING DIVIDER LINES
+                        elif "---" in stripped_line:
+                            new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            run_div = new_p.add_run(stripped_line)
+                            run_div.font.name = 'Arial'
+                            run_div.font.size = Pt(10)
+                            run_div.font.color.rgb = RGBColor(100, 100, 100)
+                            
+                        # FORMAT ANCHOR 4: REGULAR TIMELINE ENTRIES
+                        else:
+                            new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                            # Split timestamps safely if present to bold them on the left
+                            if len(stripped_line) > 5 and (stripped_line[2].isdigit() or stripped_line[1] == ":") and " " in stripped_line:
+                                space_idx = stripped_line.find(" ")
+                                time_part = stripped_line[:space_idx]
+                                text_part = stripped_line[space_idx:]
+                                
+                                run_time = new_p.add_run(time_part + "\t")
+                                run_time.bold = True
+                                run_time.font.name = 'Arial'
+                                run_time.font.size = Pt(11)
+                                
+                                run_text = new_p.add_run(text_part.strip())
+                                run_text.font.name = 'Arial'
+                                run_text.font.size = Pt(11)
+                            else:
+                                run_txt = new_p.add_run(stripped_line)
+                                run_txt.font.name = 'Arial'
+                                run_txt.font.size = Pt(11)
+                        
+                        current_para._p.addnext(new_p._p)
+                        current_para = new_p
 
             # SWAP TABLES GRID FOR HIGHLIGHTS AND PRICING
             for table in doc.tables:
-                if len(table.rows) > 1 and "{{DAY_NUM}}" in table.rows[1].cells[0].text:
-                    base_row = table.rows[1]
+                if len(table.rows) > 1 and "{{DAY_NUM}}" in table.rows.cells.text:
+                    base_row = table.rows
                     for index, row_data in enumerate(table_rows_data):
                         if index == 0:
-                            new_row = base_row
+                            new_row = table.rows
                         else:
                             new_row = table.add_row()
                         for i in range(min(len(row_data), len(new_row.cells))):
@@ -111,19 +187,3 @@ if st.button("Compile Official Word Proposal"):
                             cell.text = cell.text.replace("{{STUDENT_COST}}", student_cost)
                         if "{{GROUP_STRENGTH}}" in cell.text:
                             cell.text = cell.text.replace("{{GROUP_STRENGTH}}", group_strength)
-                        if "{{TEACHER_RATIO}}" in cell.text:
-                            cell.text = cell.text.replace("{{TEACHER_RATIO}}", teacher_ratio)
-
-            bio = io.BytesIO()
-            doc.save(bio)
-            
-            st.success("🎉 Final Document compiled perfectly with locked styling dimensions!")
-            st.download_button(
-                label="💾 Download Client Word Document (.docx)",
-                data=bio.getvalue(),
-                file_name=f"WNW_Itinerary_{school_name.replace(' ', '_')}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-            
-        except Exception as e:
-            st.error(f"Error merging template data strings: {str(e)}")
