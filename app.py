@@ -76,9 +76,9 @@ if st.button("Compile Official Word Proposal"):
                     if current_mode == "table" and "|" in line:
                         splits = [c.strip() for c in line.split('|') if c.strip()]
                         if len(splits) >= 5:
-                            meal_text = "\n".join(splits[4:])
-                            fixed_row = splits[:4] + [meal_text]
-                            table_rows_data.append(fixed_row)
+                            # Direct string reconstruction for all cell text blocks
+                            combined_meals = " ".join(splits[4:])
+                            table_rows_data.append(splits[:4] + [combined_meals])
                         else:
                             table_rows_data.append(splits)
                     elif current_mode == "inclusions": inclusions.append(line.strip())
@@ -146,11 +146,14 @@ if st.button("Compile Official Word Proposal"):
                     for idx, row_data in enumerate(table_rows_data):
                         new_row = table.rows[target_row_idx] if idx == 0 else table.add_row()
                         for i in range(min(len(row_data), len(new_row.cells))): 
-                            new_row.cells[i].text = row_data[i]
+                            cell_text = row_data[i]
+                            # DIRECT TEXT REPLACEMENT FILTER FIX: If mapping the 5th column cell (Meals index 4)
+                            if i == 4:
+                                cell_text = cell_text.replace("L:", "\nL:").replace("D:", "\nD:")
+                            new_row.cells[i].text = cell_text
                 
                 for row in table.rows:
                     for cell in row.cells:
-                        # FIXED LINE 178 PARSING BUG LINK: Safely grabs index 0 of the internal cell paragraph array list loop
                         if "{{STUDENT_COST}}" in cell.text: 
                             cell.text = cell.text.replace("{{STUDENT_COST}}", "")
                             p_run = cell.paragraphs[0].add_run(student_cost)
