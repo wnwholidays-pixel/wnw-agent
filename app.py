@@ -26,41 +26,58 @@ def append_styled_line(doc, curr_p, d_line):
     stripped = d_line.strip()
     if not stripped:
         return curr_p
-    new_p = doc.add_paragraph()
     
+    # 1. FIXED DAY TITLES: Strictly prints ONLY "DAY X" in centered blue. Removes the black repetitive route text completely!
     if stripped.upper().startswith("DAY ") and ":" in stripped:
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        day_p, route_p = stripped.split(":", 1)
-        r1 = new_p.add_run(day_p.upper() + "\n")
-        r1.font.name, r1.font.size, r1.font.bold = 'Arial', Pt(14), True
-        r1.font.color.rgb = RGBColor(0, 163, 224)
-        r2 = new_p.add_run(route_p.strip().upper())
-        r2.font.name, r2.font.size, r2.font.bold = 'Arial', Pt(14), True
+        day_p, _ = stripped.split(":", 1) # Completely discards everything after the colon
+        
+        run_day = new_p.add_run(day_p.upper().strip())
+        run_day.font.name, run_day.font.size, run_day.font.bold = 'Arial', Pt(14), True
+        run_day.font.color.rgb = RGBColor(0, 163, 224) # WNW Sky Blue
+        
+        curr_p._p.addnext(new_p._p)
+        return new_p
+        
+    # 2. SUB-ROUTE BANNER: Perfectly left-aligned and colored in blue
     elif stripped.startswith("[SUB_ROUTE]"):
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_sub = new_p.add_run(stripped.replace("[SUB_ROUTE]", "").strip())
         r_sub.font.name, r_sub.font.size, r_sub.font.bold, r_sub.font.italic = 'Arial', Pt(11), True, True
         r_sub.font.color.rgb = RGBColor(0, 163, 224)
+        
+        curr_p._p.addnext(new_p._p)
+        return new_p
+        
+    # 3. TIMELINE DIVIDERS
     elif "---" in stripped:
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r_div = new_p.add_run(stripped)
         r_div.font.name, r_div.font.size = 'Arial', Pt(10)
         r_div.font.color.rgb = RGBColor(100, 100, 100)
+        
+        curr_p._p.addnext(new_p._p)
+        return new_p
+        
+    # 4. TIMELINE ENTRIES AND BULLETS
     else:
+        new_p = doc.add_paragraph()
         new_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if len(stripped) > 5 and stripped[0:2].isdigit() and ":" in stripped:
             space_idx = stripped.find(" ")
             r_time = new_p.add_run(stripped[:space_idx] + "\t")
             r_time.bold, r_time.font.name, r_time.font.size = True, 'Arial', Pt(11)
-            # FIXED VARIABLE TYPO BUG LINK: space_idx variable is now declared and paired flawlessly here
             r_text = new_p.add_run(stripped[space_idx:].strip())
             r_text.font.name, r_text.font.size = 'Arial', Pt(11)
         else:
             r_txt = new_p.add_run(stripped)
             r_txt.font.name, r_txt.font.size = 'Arial', Pt(11)
             
-    curr_p._p.addnext(new_p._p)
-    return new_p
+        curr_p._p.addnext(new_p._p)
+        return new_p
 
 if st.button("Compile Official Word Proposal"):
     if not pasted_itinerary:
@@ -97,16 +114,27 @@ if st.button("Compile Official Word Proposal"):
                     else: 
                         if line.strip(): detailed_lines.append(line)
 
+            # FIND CLEAN COMPACT LOOPING ROUTE BANNER MAP FOR PAGE 1
+            calculated_tour_route = ""
+            if len(table_rows_data) > 0:
+                route_cities = []
+                for r_line in table_rows_data:
+                    if len(r_line) > 1:
+                        city_entry = r_line[1].upper()
+                        sub_cities = [c.strip() for c in city_entry.split('→') if c.strip()]
+                        for sc in sub_cities:
+                            if sc not in route_cities:
+                                route_cities.append(sc)
+                if len(route_cities) > 0:
+                    route_cities.append(route_cities[0])
+                calculated_tour_route = " → ".join(route_cities)
+
             for p in doc.paragraphs:
                 if "{{SCHOOL_NAME}}" in p.text: p.text = p.text.replace("{{SCHOOL_NAME}}", school_name)
                 if "{{DESTINATION_NAME}}" in p.text: p.text = p.text.replace("{{DESTINATION_NAME}}", destination_name.upper())
                 if "{{TOUR_DURATION}}" in p.text: p.text = p.text.replace("{{TOUR_DURATION}}", tour_duration)
                 if "{{TOUR_ROUTE}}" in p.text:
-                    for r_line in table_rows_data:
-                        combined_row_string = " ".join(r_line).upper()
-                        if "DAY 1" in combined_row_string or "NOV" in combined_row_string: 
-                            if len(r_line) > 1:
-                                p.text = p.text.replace("{{TOUR_ROUTE}}", str(r_line).upper())
+                    p.text = p.text.replace("{{TOUR_ROUTE}}", calculated_tour_route)
                 
                 if "{{TOUR_INCLUSIONS}}" in p.text:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
